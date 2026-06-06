@@ -865,13 +865,19 @@
 
   function renderKidView(root) {
     root.textContent = "";
+    const calc = reverseCalc();
+    const exam = latestExam();
     const studyBlocks = state.todaySchedule.filter(function (s) {
       return s.type === "study";
     });
     const prog = todayProgress();
 
+    // ---- ① ゴールを見せる：志望校・カウントダウン・判定 ----
+    root.appendChild(renderHeaderSummary(calc, exam));
+
+    // ---- ② 今日のフォーカス ----
     const hero = el("section", { class: "card kid-hero" }, [
-      el("h2", { text: "📚 きょう やること" }),
+      el("h2", { text: "📚 今日のタスク" }),
       el("div", { class: "date", text: (SEED.referenceDate || "今日") + "（予備校なし平日）" }),
       el("div", { class: "kid-progress" }, [
         gauge(prog.total ? (prog.done / prog.total) * 100 : 0, "bar-green"),
@@ -880,19 +886,26 @@
     ]);
     root.appendChild(hero);
 
-    const grid = el("div", { class: "grid grid--2" });
+    // ---- ③ 今日のタイムテーブル + 解く問題 ----
+    const gridToday = el("div", { class: "grid grid--2" });
 
-    // タイムテーブル（シンプル）
+    // タイムテーブル（シンプル・閲覧専用）
     const tl = el("div", { class: "timeline" });
     state.todaySchedule.forEach(function (slot) {
       const row = el("div", { class: "slot slot--" + slot.type });
       row.appendChild(el("div", { class: "slot__time", text: slot.start }));
-      row.appendChild(el("div", { class: "slot__body" }, [el("div", { class: "slot__label" }, [el("span", { text: (slot.type === "study" ? "✏️ " : slot.type === "fixed" ? "📌 " : "☕ ") + slot.label })])]));
+      row.appendChild(
+        el("div", { class: "slot__body" }, [
+          el("div", { class: "slot__label" }, [
+            el("span", { text: (slot.type === "study" ? "✏️ " : slot.type === "fixed" ? "📌 " : "☕ ") + slot.label }),
+          ]),
+        ])
+      );
       tl.appendChild(row);
     });
-    grid.appendChild(card("🕐 きょうの じかんわり", [tl]));
+    gridToday.appendChild(card("🕐 今日のタイムテーブル", [tl]));
 
-    // 今日とく問題（大きく・タップでチェック）
+    // 今日解く問題（タップでチェック）
     const todo = el("ul", { class: "kid-todo" });
     studyBlocks.forEach(function (block) {
       (block.problems || []).forEach(function (pid) {
@@ -903,14 +916,27 @@
           el("li", { class: "checkable" + (done ? " is-done" : ""), attrs: { "data-action": "toggle", "data-id": pid, role: "button", tabindex: "0" } }, [
             el("span", { class: "kid-check" + (done ? " on" : ""), text: done ? "✓" : "" }),
             el("span", { class: "subj-tag", text: r.subject }),
-            el("span", {}, [el("div", { class: "p", text: r.problem }), el("div", { class: "tiny", text: block.start + "〜　" + r.material })]),
+            el("span", {}, [
+              el("div", { class: "p", text: r.problem }),
+              el("div", { class: "tiny", text: block.start + "〜　" + r.material }),
+            ]),
           ])
         );
       });
     });
-    grid.appendChild(card("📝 きょう とく もんだい <span class='tiny'>（おわったらタップ）</span>", [todo, el("div", { class: "kid-note", text: prog.done >= prog.total && prog.total > 0 ? "ぜんぶ完了！よくがんばった 🎉" : "のこり " + (prog.total - prog.done) + " 問！" })]));
+    gridToday.appendChild(
+      card("📝 今日解く問題 <span class='tiny'>（完了したらタップ）</span>", [
+        todo,
+        el("div", { class: "kid-note", text: prog.done >= prog.total && prog.total > 0 ? "今日のタスク完了！お疲れさま 🎉" : "残り " + (prog.total - prog.done) + " 問" }),
+      ])
+    );
+    root.appendChild(gridToday);
 
-    root.appendChild(grid);
+    // ---- ④ 全体の現在地：合格逆算 + 科目別進捗 ----
+    const gridOverview = el("div", { class: "grid grid--2" });
+    gridOverview.appendChild(renderReversePanel(calc));
+    gridOverview.appendChild(renderSubjectProgress());
+    root.appendChild(gridOverview);
   }
 
   /* =============================================================
