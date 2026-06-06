@@ -119,6 +119,41 @@ node .preview-server.js   # → http://localhost:4173
 
 ---
 
+## 友人・協力者に編集してもらうとき
+
+### パターンA：コラボレーター（GitHubアカウント保有者向け）
+1. 嶋田さんがGitHubで Settings → Collaborators → 相手のユーザー名で招待
+2. 相手は自分のClaude Codeに次のテンプレを渡すだけ：
+
+> ```
+> リポジトリ：https://github.com/MITSUTOSHI-SHIMADA/juken-dashboard
+> 上記をローカルにcloneして、〔ここに依頼内容〕を実装してください。
+> 完了したら commit → main にpushしてください。
+> 公開URL（https://mitsutoshi-shimada.github.io/juken-dashboard/）には
+> 数分で自動反映されます。
+> ※ コード方針：data.js は初期データ、app.js は表示+状態管理、styles.css がデザイン。
+>   インラインJS/CSSは追加せず（CSP厳格化のため）、DOMは textContent / createElement で構築してください。
+> ```
+
+### パターンB：Fork + Pull Request（権限を渡さない・推奨）
+> ```
+> https://github.com/MITSUTOSHI-SHIMADA/juken-dashboard をForkして、
+> 自分のリポジトリで〔ここに依頼内容〕を実装してください。
+> 完了したら `gh pr create` でPull Requestを作成。嶋田さんがレビューしてmergeします。
+> ```
+
+### パターンC：GitHubアカウントなし（diff渡し）
+相手のClaude Codeに渡すテンプレ：
+> ```
+> https://mitsutoshi-shimada.github.io/juken-dashboard/ を確認して、
+> 〔ここに依頼内容〕を実装したいです。
+> 関係するファイル（app.js / styles.css / data.js / index.html）の
+> 完成版コードを全文出してください。嶋田さんに貼ってもらいます。
+> ```
+相手から届いたコードを嶋田さんが自分のClaudeに渡し「これに置き換えてcommit→push」と頼めば完了。
+
+---
+
 ## データ差し替え
 
 `data.js` の `window.STUDENT_DATA` を編集するだけ。
