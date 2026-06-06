@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!--
+      Content Security Policy（多層防御）
+      サーバ側ヘッダ（_headers / vercel.json）でも同じCSPを送る。
+      'unsafe-inline' を使わず済むよう JS/CSS/データを外部ファイル化している。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light" />
+
+    <title>大学受験マネジメント — ダッシュボード</title>
+    <meta
+      name="description"
+      content="合格というゴールに対し計画・進捗・生活を一元管理する、大学受験版プロジェクトマネージャー"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%93%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="app-header__inner">
+        <h1 class="app-title">
+          🎓 大学受験マネジメント
+          <small>合格までのプロジェクト管理</small>
+        </h1>
+        <div class="app-header__right">
+          <div class="tabs" role="tablist" aria-label="ビュー切替">
+            <button
+              class="tab"
+              role="tab"
+              id="tab-kid"
+              aria-controls="view-kid"
+              aria-selected="false"
+              data-action="view"
+              data-view="kid"
+            >
+              📚 本人ビュー
+            </button>
+            <button
+              class="tab"
+              role="tab"
+              id="tab-parent"
+              aria-controls="view-parent"
+              aria-selected="true"
+              data-action="view"
+              data-view="parent"
+            >
+              🧑‍💼 親ビュー
+            </button>
+          </div>
+          <button class="reset-btn" type="button" data-action="reset" title="初期データに戻す">
+            ↺ リセット
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div id="flash" class="flash" role="status" aria-live="polite"></div>
+
+    <main class="wrap">
+      <section
+        class="view"
+        id="view-kid"
+        role="tabpanel"
+        aria-labelledby="tab-kid"
+        hidden
+      ></section>
+
+      <section
+        class="view"
+        id="view-parent"
+        role="tabpanel"
+        aria-labelledby="tab-parent"
+      ></section>
+
+      <p class="foot">
+        操作内容（採点・チェック・周回）はこの端末のブラウザに保存されます（localStorage）。
+        「↺ リセット」で初期データに戻ります。<br />
+        ※ 成績・氏名・教材はすべてダミー。実データを載せる場合はアクセス制御の検討を。
+      </p>
+    </main>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
