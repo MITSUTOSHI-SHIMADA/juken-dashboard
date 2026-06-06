@@ -58,6 +58,11 @@
   function clamp(n, lo, hi) {
     return Math.max(lo, Math.min(hi, n));
   }
+  // "HH:MM" → 分
+  function toMin(hhmm) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm));
+    return m ? +m[1] * 60 + +m[2] : 0;
+  }
   function deepClone(o) {
     return JSON.parse(JSON.stringify(o));
   }
@@ -103,11 +108,26 @@
   let state;
 
   function seedState() {
+    // スケジュールに一意IDを振る（追加・編集・削除のキーに使う）
+    const sched = deepClone(SEED.todaySchedule);
+    let nextSlotId = 1;
+    sched.forEach(function (s) {
+      s.id = "s" + nextSlotId++;
+    });
+    // 既存の問題IDの最大値から次のIDを採番
+    const queue = deepClone(SEED.reviewQueue);
+    const maxR = queue.reduce(function (m, r) {
+      const n = parseInt(String(r.id).slice(1), 10);
+      return isFinite(n) ? Math.max(m, n) : m;
+    }, 0);
     return {
       schemaVersion: SEED.schemaVersion,
       materials: deepClone(SEED.materials),
-      reviewQueue: deepClone(SEED.reviewQueue),
-      // 今日チェックした問題ID（純粋に当日の進捗トラッカー）
+      reviewQueue: queue,
+      todaySchedule: sched,
+      nextSlotId: nextSlotId,
+      nextProblemId: maxR + 1,
+      // 今日チェックした問題ID（当日の進捗トラッカー）
       completedToday: {},
       // 採点ログ（最新の操作を画面に出すため）
       lastAction: null,
@@ -225,7 +245,7 @@
   // 今日のタイムテーブル上の問題ID（重複排除）
   function todayProblemIds() {
     const ids = [];
-    SEED.todaySchedule.forEach(function (s) {
+    state.todaySchedule.forEach(function (s) {
       (s.problems || []).forEach(function (p) {
         if (ids.indexOf(p) < 0) ids.push(p);
       });
@@ -298,6 +318,125 @@
     m.completed = clamp(m.completed + delta, 0, m.totalProblems);
     save();
     renderAll();
+  }
+
+  /* ---------- スケジュール CRUD ---------- */
+
+  function slotById(id) {
+    return state.todaySchedule.find(function (s) {
+      return s.id === id;
+    });
+  }
+
+  function sortSchedule() {
+    state.todaySchedule.sort(function (a, b) {
+      return toMin(a.start) - toMin(b.start);
+    });
+  }
+
+  function saveSlot(values, id) {
+    // values: {start,end,type,label,problems[]}
+    if (!values.start || !values.end || !values.label) {
+      flash("時間とラベルを入力してください");
+      return false;
+    }
+    if (toMin(values.end) <= toMin(values.start)) {
+      flash("終了時刻は開始時刻より後にしてください");
+      return false;
+    }
+    if (id) {
+      const s = slotById(id);
+      if (!s) return false;
+      s.start = values.start;
+      s.end = values.end;
+      s.type = values.type;
+      s.label = values.label;
+      s.problems = values.type === "study" ? (values.problems || []) : [];
+    } else {
+      state.todaySchedule.push({
+        id: "s" + state.nextSlotId++,
+        start: values.start,
+        end: values.end,
+        type: values.type,
+        label: values.label,
+        problems: values.type === "study" ? (values.problems || []) : [],
+      });
+    }
+    sortSchedule();
+    ui.editing = null;
+    save();
+    renderAll();
+    flash(id ? "予定を更新しました" : "予定を追加しました");
+    return true;
+  }
+
+  function deleteSlot(id) {
+    if (!window.confirm("この予定を削除しますか？")) return;
+    state.todaySchedule = state.todaySchedule.filter(function (s) {
+      return s.id !== id;
+    });
+    if (ui.editing === id) ui.editing = null;
+    save();
+    renderAll();
+    flash("予定を削除しました");
+  }
+
+  function toggleSlotProblem(slotId, problemId) {
+    const s = slotById(slotId);
+    if (!s) return;
+    s.problems = s.problems || [];
+    const i = s.problems.indexOf(problemId);
+    if (i >= 0) s.problems.splice(i, 1);
+    else s.problems.push(problemId);
+    save();
+    renderAll();
+  }
+
+  /* ---------- 問題 CRUD ---------- */
+
+  function addProblem(values) {
+    if (!values.subject || !values.material || !values.problem) {
+      flash("科目・教材・問題をすべて入力してください");
+      return false;
+    }
+    const newId = "r" + state.nextProblemId++;
+    state.reviewQueue.push({
+      id: newId,
+      subject: values.subject,
+      material: values.material,
+      problem: values.problem,
+      lastResult: "△",
+      intervalStage: 0,
+      nextDate: fmtDate(today()),
+      priority: "中",
+      mastered: false,
+    });
+    ui.editing = null;
+    save();
+    renderAll();
+    flash("問題を追加しました：" + values.problem);
+    return true;
+  }
+
+  function deleteProblem(id) {
+    const r = reviewById(id);
+    if (!r) return;
+    if (!window.confirm("「" + r.problem + "」を削除しますか？")) return;
+    state.reviewQueue = state.reviewQueue.filter(function (x) {
+      return x.id !== id;
+    });
+    // どの予定からも参照を外す
+    state.todaySchedule.forEach(function (s) {
+      if (s.problems && s.problems.length) {
+        s.problems = s.problems.filter(function (p) {
+          return p !== id;
+        });
+      }
+    });
+    delete state.completedToday[id];
+    save();
+    renderAll();
+    flash("問題を削除しました");
   }
 
   /* =============================================================
@@ -442,37 +581,154 @@
     return card("📊 科目別進捗 <span class='tiny'>（周回を更新すると信号が自動再判定）</span>", body);
   }
 
+  const TYPE_LABEL = { fixed: "固定", study: "学習", free: "自由" };
+  const TYPE_ICON = { fixed: "📌", study: "✏️", free: "☕" };
+
   function renderTimetable() {
     const tl = el("div", { class: "timeline" });
-    const typeLabel = { fixed: "固定", study: "学習", free: "自由" };
-    SEED.todaySchedule.forEach(function (slot) {
-      const row = el("div", { class: "slot slot--" + slot.type });
-      row.appendChild(el("div", { class: "slot__time", text: slot.start + "–" + slot.end }));
-      const bodyChildren = [
-        el("div", { class: "slot__label" }, [el("span", { text: slot.label }), el("span", { class: "slot__type", attrs: { style: "color:var(--ink-faint)" }, text: typeLabel[slot.type] || slot.type })]),
-      ];
-      if (slot.problems && slot.problems.length) {
-        const ul = el("ul", { class: "slot__problems" });
-        slot.problems.forEach(function (pid) {
-          const r = reviewById(pid);
-          if (!r) return;
-          const done = !!state.completedToday[pid];
-          ul.appendChild(
-            el("li", { class: "checkable" + (done ? " is-done" : ""), attrs: { "data-action": "toggle", "data-id": pid, role: "button", tabindex: "0" } }, [
-              el("span", { class: "chk" + (done ? " on" : ""), text: done ? "✓" : "" }),
-              el("span", { class: "result-chip result-" + r.lastResult, text: r.lastResult }),
-              el("span", {}, [el("strong", { text: r.subject + "：" }), el("span", { text: r.problem })]),
-            ])
-          );
-        });
-        bodyChildren.push(ul);
-      }
-      row.appendChild(el("div", { class: "slot__body" }, bodyChildren));
-      tl.appendChild(row);
+    state.todaySchedule.forEach(function (slot) {
+      tl.appendChild(slot.id === ui.editing ? renderSlotEditForm(slot) : renderSlotRow(slot));
     });
+    // 末尾：追加フォーム or 追加ボタン
+    if (ui.editing === "new-slot") {
+      tl.appendChild(renderSlotEditForm(null));
+    } else {
+      const addRow = el("div", { class: "add-row" }, [
+        btn("＋ 予定を追加", "new-slot", {}, "btn add-btn"),
+      ]);
+      tl.appendChild(addRow);
+    }
     const prog = todayProgress();
-    const head = el("div", { class: "today-prog" }, [el("span", { text: "今日の問題 " }), el("strong", { text: prog.done + " / " + prog.total }), el("span", { text: " 完了" })]);
-    return card("🗓️ 今日のタイムテーブル <span class='tiny'>（予備校なし平日・問題はタップで完了）</span>", [head, tl]);
+    const head = el("div", { class: "today-prog" }, [
+      el("span", { text: "今日の問題 " }),
+      el("strong", { text: prog.done + " / " + prog.total }),
+      el("span", { text: " 完了" }),
+    ]);
+    return card("🗓️ 今日のタイムテーブル <span class='tiny'>（追加・編集・削除でき、本人ビューにも反映）</span>", [head, tl]);
+  }
+
+  function renderSlotRow(slot) {
+    const row = el("div", { class: "slot slot--" + slot.type });
+    row.appendChild(el("div", { class: "slot__time", text: slot.start + "–" + slot.end }));
+    const bodyChildren = [
+      el("div", { class: "slot__label" }, [
+        el("span", { text: slot.label }),
+        el("span", { class: "slot__type", attrs: { style: "color:var(--ink-faint)" }, text: TYPE_LABEL[slot.type] || slot.type }),
+        el("span", { class: "slot__actions" }, [
+          btn("✏️", "edit-slot", { id: slot.id }, "icon-btn"),
+          btn("🗑️", "delete-slot", { id: slot.id }, "icon-btn"),
+        ]),
+      ]),
+    ];
+    if (slot.problems && slot.problems.length) {
+      const ul = el("ul", { class: "slot__problems" });
+      slot.problems.forEach(function (pid) {
+        const r = reviewById(pid);
+        if (!r) return;
+        const done = !!state.completedToday[pid];
+        ul.appendChild(
+          el("li", { class: "checkable" + (done ? " is-done" : ""), attrs: { "data-action": "toggle", "data-id": pid, role: "button", tabindex: "0" } }, [
+            el("span", { class: "chk" + (done ? " on" : ""), text: done ? "✓" : "" }),
+            el("span", { class: "result-chip result-" + r.lastResult, text: r.lastResult }),
+            el("span", {}, [el("strong", { text: r.subject + "：" }), el("span", { text: r.problem })]),
+          ])
+        );
+      });
+      bodyChildren.push(ul);
+    }
+    row.appendChild(el("div", { class: "slot__body" }, bodyChildren));
+    return row;
+  }
+
+  function renderSlotEditForm(slot) {
+    // slot=null → 新規。else → 編集
+    const isNew = !slot;
+    const cur = slot || { id: "", start: "08:00", end: "09:00", type: "study", label: "", problems: [] };
+    const form = el("div", { class: "edit-form slot-form", attrs: { "data-slot-id": cur.id, "data-mode": isNew ? "new" : "edit" } });
+
+    form.appendChild(el("div", { class: "form-title", text: isNew ? "＋ 新しい予定" : "✏️ 予定を編集" }));
+
+    // 時間
+    const timeRow = el("div", { class: "form-row" }, [
+      el("label", { class: "form-label", text: "時間" }),
+      el("div", { class: "time-inputs" }, [
+        el("input", { class: "input time-in", attrs: { type: "time", "data-field": "start", value: cur.start } }),
+        el("span", { text: "〜" }),
+        el("input", { class: "input time-in", attrs: { type: "time", "data-field": "end", value: cur.end } }),
+      ]),
+    ]);
+    form.appendChild(timeRow);
+
+    // 種類
+    const typeRow = el("div", { class: "form-row" }, [
+      el("label", { class: "form-label", text: "種類" }),
+      el("div", { class: "type-chips" }, ["fixed", "study", "free"].map(function (t) {
+        const chip = el("label", { class: "type-chip type-chip--" + t + (cur.type === t ? " is-active" : "") }, [
+          el("input", { attrs: { type: "radio", name: "type-" + (cur.id || "new"), value: t, "data-field": "type" } }),
+          el("span", { text: TYPE_ICON[t] + " " + TYPE_LABEL[t] }),
+        ]);
+        const inp = chip.querySelector("input");
+        if (cur.type === t) inp.checked = true;
+        return chip;
+      })),
+    ]);
+    form.appendChild(typeRow);
+
+    // ラベル
+    form.appendChild(
+      el("div", { class: "form-row" }, [
+        el("label", { class: "form-label", text: "内容" }),
+        el("input", { class: "input", attrs: { type: "text", "data-field": "label", value: cur.label, placeholder: "例：数学 演習、夕食、休憩" } }),
+      ])
+    );
+
+    // 関連問題（学習タイプのみ）
+    const problemsRow = el("div", { class: "form-row problems-row" });
+    problemsRow.appendChild(el("label", { class: "form-label", text: "関連する問題" }));
+    const chips = el("div", { class: "problem-chips" });
+    const active = state.reviewQueue.filter(function (r) { return !r.mastered; });
+    if (active.length === 0) {
+      chips.appendChild(el("span", { class: "muted tiny", text: "（解き直しキューに問題がありません）" }));
+    }
+    active.forEach(function (r) {
+      const checked = (cur.problems || []).indexOf(r.id) >= 0;
+      const chip = el("label", { class: "p-chip" + (checked ? " is-active" : "") }, [
+        el("input", { attrs: { type: "checkbox", "data-problem-id": r.id } }),
+        el("span", { class: "subj-pill", text: r.subject }),
+        el("span", { text: " " + r.problem }),
+      ]);
+      const inp = chip.querySelector("input");
+      if (checked) inp.checked = true;
+      chips.appendChild(chip);
+    });
+    problemsRow.appendChild(chips);
+    form.appendChild(problemsRow);
+
+    // ボタン
+    form.appendChild(
+      el("div", { class: "form-actions" }, [
+        btn(isNew ? "追加" : "保存", "save-slot", { id: cur.id || "" }, "btn btn--primary"),
+        btn("キャンセル", "cancel-edit", {}, "btn"),
+      ])
+    );
+
+    return form;
+  }
+
+  function readSlotForm(formEl) {
+    const fields = { start: "", end: "", type: "study", label: "", problems: [] };
+    formEl.querySelectorAll("[data-field]").forEach(function (inp) {
+      const k = inp.dataset.field;
+      if (k === "type") {
+        if (inp.checked) fields.type = inp.value;
+      } else {
+        fields[k] = inp.value;
+      }
+    });
+    formEl.querySelectorAll("[data-problem-id]").forEach(function (inp) {
+      if (inp.checked) fields.problems.push(inp.dataset.problemId);
+    });
+    return fields;
   }
 
   function renderReviewQueue() {
@@ -491,20 +747,79 @@
         el("li", { class: "prio-" + r.priority }, [
           el("span", { class: "result-chip result-" + r.lastResult, text: r.lastResult }),
           el("div", { class: "queue__main" }, [
-            el("div", { class: "queue__problem" }, [el("span", { class: "subj-pill", text: r.subject }), el("span", { text: "　" + r.problem })]),
-            el("div", { class: "queue__meta" }, [el("span", { text: r.material + "　／　間隔: " + (STAGE_LABELS[r.intervalStage] || r.intervalStage) }), stageDots(r.intervalStage)]),
+            el("div", { class: "queue__problem" }, [
+              el("span", { class: "subj-pill", text: r.subject }),
+              el("span", { text: "　" + r.problem }),
+            ]),
+            el("div", { class: "queue__meta" }, [
+              el("span", { text: r.material + "　／　間隔: " + (STAGE_LABELS[r.intervalStage] || r.intervalStage) }),
+              stageDots(r.intervalStage),
+            ]),
           ]),
           el("div", { class: "grade" }, [
             btn("○", "grade", { id: r.id, result: "○" }, "btn btn--grade grade-o"),
             btn("△", "grade", { id: r.id, result: "△" }, "btn btn--grade grade-t"),
             btn("×", "grade", { id: r.id, result: "×" }, "btn btn--grade grade-x"),
+            btn("🗑️", "delete-problem", { id: r.id }, "icon-btn"),
           ]),
         ])
       );
     });
 
+    // 追加フォーム or 追加ボタン
+    const addBox =
+      ui.editing === "new-problem"
+        ? renderProblemAddForm()
+        : el("div", { class: "add-row" }, [btn("＋ 問題を追加", "new-problem", {}, "btn add-btn")]);
+
     const note = el("p", { class: "tiny", text: "忘却曲線：初回→翌日→3日後→1週間後→2週間後→1ヶ月後。× は翌日に戻し頻度UP、○ は次段階へ。今日 " + items.length + " 件／習得済み " + masteredCount() + " 件。" });
-    return card("🔁 解き直しキュー <span class='tiny'>（○△×で採点）</span>", [list, note]);
+    return card("🔁 解き直しキュー <span class='tiny'>（○△×で採点・問題の追加削除も）</span>", [list, addBox, note]);
+  }
+
+  function renderProblemAddForm() {
+    const form = el("div", { class: "edit-form problem-form" });
+    form.appendChild(el("div", { class: "form-title", text: "＋ 新しい問題" }));
+
+    // 科目
+    const subjSel = el("select", { class: "input", attrs: { "data-field": "subject" } });
+    SUBJECTS.forEach(function (s) {
+      subjSel.appendChild(el("option", { text: s, attrs: { value: s } }));
+    });
+    form.appendChild(
+      el("div", { class: "form-row" }, [
+        el("label", { class: "form-label", text: "科目" }),
+        subjSel,
+      ])
+    );
+    // 教材
+    form.appendChild(
+      el("div", { class: "form-row" }, [
+        el("label", { class: "form-label", text: "教材" }),
+        el("input", { class: "input", attrs: { type: "text", "data-field": "material", placeholder: "例：青チャートIII" } }),
+      ])
+    );
+    // 問題
+    form.appendChild(
+      el("div", { class: "form-row" }, [
+        el("label", { class: "form-label", text: "問題" }),
+        el("input", { class: "input", attrs: { type: "text", "data-field": "problem", placeholder: "例：微分法の応用 例題128" } }),
+      ])
+    );
+    form.appendChild(
+      el("div", { class: "form-actions" }, [
+        btn("追加", "save-problem", {}, "btn btn--primary"),
+        btn("キャンセル", "cancel-edit", {}, "btn"),
+      ])
+    );
+    return form;
+  }
+
+  function readProblemForm(formEl) {
+    const fields = { subject: "", material: "", problem: "" };
+    formEl.querySelectorAll("[data-field]").forEach(function (inp) {
+      fields[inp.dataset.field] = inp.value.trim();
+    });
+    return fields;
   }
 
   function renderWeeklyReview() {
@@ -550,7 +865,7 @@
 
   function renderKidView(root) {
     root.textContent = "";
-    const studyBlocks = SEED.todaySchedule.filter(function (s) {
+    const studyBlocks = state.todaySchedule.filter(function (s) {
       return s.type === "study";
     });
     const prog = todayProgress();
@@ -569,7 +884,7 @@
 
     // タイムテーブル（シンプル）
     const tl = el("div", { class: "timeline" });
-    SEED.todaySchedule.forEach(function (slot) {
+    state.todaySchedule.forEach(function (slot) {
       const row = el("div", { class: "slot slot--" + slot.type });
       row.appendChild(el("div", { class: "slot__time", text: slot.start }));
       row.appendChild(el("div", { class: "slot__body" }, [el("div", { class: "slot__label" }, [el("span", { text: (slot.type === "study" ? "✏️ " : slot.type === "fixed" ? "📌 " : "☕ ") + slot.label })])]));
@@ -602,7 +917,7 @@
    * ビュー切替・イベント・初期化
    * ============================================================= */
 
-  const ui = { view: "parent" };
+  const ui = { view: "parent", editing: null };
 
   function switchView(view) {
     ui.view = view;
@@ -630,13 +945,43 @@
     }, 2600);
   }
 
-  function handleAction(action, dataset) {
+  function handleAction(action, dataset, target) {
     if (action === "grade") gradeReview(dataset.id, dataset.result);
     else if (action === "toggle") toggleProblem(dataset.id);
     else if (action === "bump") bumpMaterial(dataset.id, parseInt(dataset.delta, 10));
     else if (action === "reset") {
       if (window.confirm("入力した進捗を破棄して初期データに戻します。よろしいですか？")) resetState();
     } else if (action === "view") switchView(dataset.view);
+    // --- スケジュール編集 ---
+    else if (action === "edit-slot") {
+      ui.editing = dataset.id;
+      renderAll();
+    } else if (action === "new-slot") {
+      ui.editing = "new-slot";
+      renderAll();
+    } else if (action === "cancel-edit") {
+      ui.editing = null;
+      renderAll();
+    } else if (action === "save-slot") {
+      const formEl = target.closest(".slot-form");
+      if (!formEl) return;
+      const values = readSlotForm(formEl);
+      saveSlot(values, dataset.id || null);
+    } else if (action === "delete-slot") {
+      deleteSlot(dataset.id);
+    }
+    // --- 問題の追加削除 ---
+    else if (action === "new-problem") {
+      ui.editing = "new-problem";
+      renderAll();
+    } else if (action === "save-problem") {
+      const formEl = target.closest(".problem-form");
+      if (!formEl) return;
+      const values = readProblemForm(formEl);
+      addProblem(values);
+    } else if (action === "delete-problem") {
+      deleteProblem(dataset.id);
+    }
   }
 
   function init() {
@@ -650,7 +995,28 @@
     document.body.addEventListener("click", function (e) {
       const t = e.target.closest("[data-action]");
       if (!t) return;
-      handleAction(t.dataset.action, t.dataset);
+      handleAction(t.dataset.action, t.dataset, t);
+    });
+    // チップ式ラジオ／チェックの即時UI反映＋type切替で関連問題行を出し分け
+    document.body.addEventListener("change", function (e) {
+      const radio = e.target.closest(".type-chip input[type='radio']");
+      if (radio) {
+        const group = radio.closest(".type-chips");
+        group.querySelectorAll(".type-chip").forEach(function (c) {
+          c.classList.toggle("is-active", c.contains(radio) ? radio.checked : false);
+        });
+        // 学習タイプ以外は関連問題行をグレーアウト
+        const form = radio.closest(".slot-form");
+        if (form) {
+          const row = form.querySelector(".problems-row");
+          if (row) row.classList.toggle("is-disabled", radio.value !== "study");
+        }
+        return;
+      }
+      const pchk = e.target.closest(".p-chip input[type='checkbox']");
+      if (pchk) {
+        pchk.closest(".p-chip").classList.toggle("is-active", pchk.checked);
+      }
     });
     // キーボード操作（チェック可能項目）
     document.body.addEventListener("keydown", function (e) {
@@ -658,7 +1024,7 @@
       const t = e.target.closest("[data-action='toggle']");
       if (!t) return;
       e.preventDefault();
-      handleAction("toggle", t.dataset);
+      handleAction("toggle", t.dataset, t);
     });
   }
 
