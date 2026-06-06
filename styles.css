@@ -57,6 +57,25 @@ body {
   background: linear-gradient(135deg, #6e2b58 0%, #a8527f 55%, #c77b9e 100%);
   color: #fff;
 }
+.move-notice {
+  background: #fff3cd;
+  border-bottom: 1px solid #ffe082;
+  color: #6b4d00;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  align-items: center;
+}
+.move-notice a {
+  color: var(--brand-dark);
+  text-decoration: underline;
+  word-break: break-all;
+}
 .app-header__inner {
   max-width: 1120px;
   margin: 0 auto;

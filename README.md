@@ -1,5 +1,11 @@
 # 大学受験 学習マネジメント ダッシュボード（動的Webアプリ）
 
+**🔗 公開URL：https://rn-juken-dashboard-2026.netlify.app/**
+（GitHub Pages版 https://rn-juken-dashboard-2026.netlify.app/ も同じ内容で公開中・後継URLへ案内）
+
+---
+
+
 「合格」というゴールに対し、計画・進捗・生活を一元管理する
 **大学受験版プロジェクトマネージャー**。家庭教師アプリではなく「管理」に徹する設計。
 
@@ -129,7 +135,7 @@ node .preview-server.js   # → http://localhost:4173
 > リポジトリ：https://github.com/MITSUTOSHI-SHIMADA/juken-dashboard
 > 上記をローカルにcloneして、〔ここに依頼内容〕を実装してください。
 > 完了したら commit → main にpushしてください。
-> 公開URL（https://mitsutoshi-shimada.github.io/juken-dashboard/）には
+> 公開URL（https://rn-juken-dashboard-2026.netlify.app/）には
 > 数分で自動反映されます。
 > ※ コード方針：data.js は初期データ、app.js は表示+状態管理、styles.css がデザイン。
 >   インラインJS/CSSは追加せず（CSP厳格化のため）、DOMは textContent / createElement で構築してください。
@@ -145,7 +151,7 @@ node .preview-server.js   # → http://localhost:4173
 ### パターンC：GitHubアカウントなし（diff渡し）
 相手のClaude Codeに渡すテンプレ：
 > ```
-> https://mitsutoshi-shimada.github.io/juken-dashboard/ を確認して、
+> https://rn-juken-dashboard-2026.netlify.app/ を確認して、
 > 〔ここに依頼内容〕を実装したいです。
 > 関係するファイル（app.js / styles.css / data.js / index.html）の
 > 完成版コードを全文出してください。嶋田さんに貼ってもらいます。

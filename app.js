@@ -1010,10 +1010,26 @@
     }
   }
 
+  // GitHub Pages版を見ている人に新URLを案内する小バナー
+  function showMoveNoticeIfNeeded() {
+    try {
+      if (!/github\.io$/.test(location.hostname)) return;
+      const canonical = "https://rn-juken-dashboard-2026.netlify.app/";
+      const bar = el("div", { class: "move-notice" });
+      bar.appendChild(el("span", { text: "📣 新しい公開URL：" }));
+      bar.appendChild(el("a", { text: canonical, attrs: { href: canonical, rel: "noopener" } }));
+      bar.appendChild(el("span", { text: "（このページも同じ内容です）" }));
+      document.body.insertBefore(bar, document.body.firstChild);
+    } catch (e) {
+      /* noop */
+    }
+  }
+
   function init() {
     if (!SEED) return;
     state = load() || seedState();
 
+    showMoveNoticeIfNeeded();
     renderAll();
     switchView("parent");
 
