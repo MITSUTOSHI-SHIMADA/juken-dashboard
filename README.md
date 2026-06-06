@@ -127,6 +127,19 @@ node .preview-server.js   # → http://localhost:4173
 
 ## 友人・協力者に編集してもらうとき
 
+### 🟢 推奨ルート：GitHubアカウント不要のコード手渡し方式
+
+専用のドキュメントを用意しました。協力者にこれらのリンクを送ってください：
+
+- **協力者本人向け（人間用・やさしい手順）**：[docs/FOR-FRIEND.md](docs/FOR-FRIEND.md)
+- **協力者のClaudeに最初に貼るもの（技術仕様）**：[docs/CLAUDE-SPEC.md](docs/CLAUDE-SPEC.md)
+  - raw URL（コピペ用）：
+    https://raw.githubusercontent.com/MITSUTOSHI-SHIMADA/juken-dashboard/main/docs/CLAUDE-SPEC.md
+
+協力者は GitHub アカウントもgit操作も不要。「自分のClaudeに相談 → 出てきたコードを嶋田さんにLINE で送る」だけ。嶋田さん側は届いたコードを自分のClaudeに渡して「これに置き換えてpushして」と指示するだけ。
+
+---
+
 ### パターンA：コラボレーター（GitHubアカウント保有者向け）
 1. 嶋田さんがGitHubで Settings → Collaborators → 相手のユーザー名で招待
 2. 相手は自分のClaude Codeに次のテンプレを渡すだけ：
