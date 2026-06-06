@@ -1,7 +1,7 @@
 # 大学受験 学習マネジメント ダッシュボード（動的Webアプリ）
 
 **🔗 公開URL：https://rn-juken-dashboard-2026.netlify.app/**
-（GitHub Pages版 https://rn-juken-dashboard-2026.netlify.app/ も同じ内容で公開中・後継URLへ案内）
+（旧 GitHub Pages版 https://mitsutoshi-shimada.github.io/juken-dashboard/ も同じ内容で公開中・上部に新URLへの案内バナーを表示）
 
 ---
 
