@@ -10,7 +10,7 @@
  * ============================================================= */
 window.STUDENT_DATA = {
   // スキーマのバージョン（保存データの互換判定に使用）
-  schemaVersion: 4,
+  schemaVersion: 5,
 
   // ===== 基本情報 =====
   profile: {
@@ -25,15 +25,17 @@ window.STUDENT_DATA = {
   // ===== 志望校 =====
   schools: [
     {
+      id: "school1",
       name: "第一志望大学 工学部",
       priority: 1,
-      examDate: "2027-02-25", // 個別（二次）試験
-      commonTestDate: "2027-01-16", // 共通テスト
+      examDate: "2027-02-25",
+      commonTestDate: "2027-01-16",
       passLineDeviation: 62,
-      passLineScoreRate: 0.68, // 二次得点率の合格ライン目安
-      commonTestTargetRate: 0.78, // 共通テスト得点率の目標
+      passLineScoreRate: 0.68,
+      commonTestTargetRate: 0.78,
     },
     {
+      id: "school2",
       name: "第二志望大学 理工学部",
       priority: 2,
       examDate: "2027-02-10",

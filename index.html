@@ -4,11 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!--
-      Content Security Policy（多層防御）
-      サーバ側ヘッダ（_headers / vercel.json）でも同じCSPを送る。
-      'unsafe-inline' を使わず済むよう JS/CSS/データを外部ファイル化している。
-    -->
+    <!-- Content Security Policy（多層防御） -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
@@ -18,10 +14,7 @@
     <meta name="color-scheme" content="light" />
 
     <title>大学受験マネジメント — ダッシュボード</title>
-    <meta
-      name="description"
-      content="合格というゴールに対し計画・進捗・生活を一元管理する、大学受験版プロジェクトマネージャー"
-    />
+    <meta name="description" content="家族で使う大学受験版プロジェクトマネージャー" />
     <link rel="stylesheet" href="styles.css" />
     <link
       rel="icon"
@@ -29,70 +22,88 @@
     />
   </head>
   <body>
-    <header class="app-header">
-      <div class="app-header__inner">
-        <h1 class="app-title">
-          🎓 大学受験マネジメント
-          <small>合格までのプロジェクト管理</small>
-        </h1>
-        <div class="app-header__right">
-          <div class="tabs" role="tablist" aria-label="ビュー切替">
-            <button
-              class="tab"
-              role="tab"
-              id="tab-kid"
-              aria-controls="view-kid"
-              aria-selected="false"
-              data-action="view"
-              data-view="kid"
-            >
-              📚 本人ビュー
-            </button>
-            <button
-              class="tab"
-              role="tab"
-              id="tab-parent"
-              aria-controls="view-parent"
-              aria-selected="true"
-              data-action="view"
-              data-view="parent"
-            >
-              🧑‍💼 親ビュー
-            </button>
-          </div>
-          <button class="reset-btn" type="button" data-action="reset" title="初期データに戻す">
-            ↺ リセット
-          </button>
-        </div>
-      </div>
-    </header>
-
+    <!-- フラッシュメッセージ -->
     <div id="flash" class="flash" role="status" aria-live="polite"></div>
 
-    <main class="wrap">
-      <section
-        class="view"
-        id="view-kid"
-        role="tabpanel"
-        aria-labelledby="tab-kid"
-        hidden
-      ></section>
+    <!-- アプリ全体（ロック解除後に表示） -->
+    <div id="app" class="app-layout" hidden>
+      <aside class="sidebar" id="sidebar" aria-label="メニュー">
+        <div class="sidebar__brand">
+          <span class="sidebar__brand-icon">🎓</span>
+          <span class="sidebar__brand-text">受験ダッシュボード</span>
+        </div>
+        <nav class="sidebar__nav" id="sidebar-nav" role="navigation"></nav>
+        <div class="sidebar__bottom">
+          <div class="role-toggle" id="role-toggle"></div>
+          <button class="lock-btn" type="button" data-action="lock" hidden id="lock-btn">
+            <span aria-hidden="true">🔒</span> ロック
+          </button>
+        </div>
+      </aside>
 
-      <section
-        class="view"
-        id="view-parent"
-        role="tabpanel"
-        aria-labelledby="tab-parent"
-      ></section>
+      <main class="content">
+        <header class="topbar">
+          <button class="topbar__menu" type="button" data-action="toggle-sidebar" aria-label="メニューを開く">☰</button>
+          <h1 class="page-title" id="page-title">ダッシュボード</h1>
+          <div class="topbar__actions" id="topbar-actions"></div>
+        </header>
+        <div class="page-content" id="page-content"></div>
+        <footer class="page-foot">
+          このアプリのデータは、お使いの端末ブラウザ内（localStorage）のみに保存されます。
+          外部にデータは送信されません。
+        </footer>
+      </main>
+    </div>
 
-      <p class="foot">
-        操作内容（採点・チェック・周回）はこの端末のブラウザに保存されます（localStorage）。
-        「↺ リセット」で初期データに戻ります。<br />
-        ※ 成績・氏名・教材はすべてダミー。実データを載せる場合はアクセス制御の検討を。
-      </p>
-    </main>
+    <!-- 鍵モーダル（パスコード入力 / 設定 / リセット） -->
+    <div id="lock-screen" class="lock-screen" hidden>
+      <div class="lock-card">
+        <div class="lock-icon" aria-hidden="true">🔐</div>
+        <h2 class="lock-title" id="lock-title">パスコードを入力</h2>
+        <p class="lock-desc" id="lock-desc">家族専用の合言葉です</p>
+        <form id="lock-form" autocomplete="off">
+          <input
+            id="lock-input"
+            type="password"
+            inputmode="text"
+            class="lock-input"
+            placeholder="••••••"
+            aria-label="パスコード"
+            autocomplete="off"
+            autofocus
+          />
+          <input
+            id="lock-input2"
+            type="password"
+            inputmode="text"
+            class="lock-input"
+            placeholder="もう一度入力"
+            aria-label="パスコード確認"
+            autocomplete="off"
+            hidden
+          />
+          <p class="lock-err" id="lock-err" role="alert"></p>
+          <button class="btn btn--primary lock-submit" type="submit" id="lock-submit">ロック解除</button>
+        </form>
+        <div class="lock-meta" id="lock-meta"></div>
+      </div>
+    </div>
+
+    <!-- 汎用モーダル（編集・確認ダイアログ用） -->
+    <div id="modal" class="modal" hidden>
+      <div class="modal__overlay" data-action="modal-close"></div>
+      <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal__head">
+          <h3 class="modal__title" id="modal-title"></h3>
+          <button class="modal__close" type="button" data-action="modal-close" aria-label="閉じる">✕</button>
+        </div>
+        <div class="modal__body" id="modal-body"></div>
+        <div class="modal__foot" id="modal-foot"></div>
+      </div>
+    </div>
 
     <script src="data.js"></script>
+    <script src="security.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
