@@ -1219,18 +1219,18 @@
     const isChange = SECURITY.isPasscodeSet();
     const form = el("form", { class: "form-grid passcode-form" });
     if (isChange) {
-      form.appendChild(formRow("現在のパスコード", input("current", { type: "password", placeholder: "現在のパスコード" })));
+      form.appendChild(formRow("現在のパスコード", input("current", { type: "password", placeholder: "現在のパスコード", cls: "input--mono" })));
     }
-    form.appendChild(formRow("新しいパスコード", input("new1", { type: "password", placeholder: "4文字以上" })));
-    form.appendChild(formRow("確認用にもう一度", input("new2", { type: "password", placeholder: "もう一度" })));
-    openModal(isChange ? "パスコードを変更" : "パスコードを設定", [form, el("p", { class: "tiny", attrs: { style: "margin-top:12px" }, text: "※ 忘れると復元できません。Web Crypto APIで PBKDF2(250k iter) → AES-GCM で暗号化します。" })], [
+    form.appendChild(formRow("新しいパスコード", input("new1", { type: "password", placeholder: "英数字6文字以上（例: family2026）", cls: "input--mono" })));
+    form.appendChild(formRow("確認用にもう一度", input("new2", { type: "password", placeholder: "もう一度", cls: "input--mono" })));
+    openModal(isChange ? "パスコードを変更" : "パスコードを設定", [form, el("p", { class: "tiny", attrs: { style: "margin-top:12px" }, text: "※ 半角の英字（A〜Z, a〜z）と数字（0〜9）のみ・6文字以上。忘れると復元できません。Web Crypto APIで PBKDF2(250k iter) → AES-GCM で暗号化します。" })], [
       btn("キャンセル", "modal-close"),
       btn("保存", "submit-passcode", {}, "btn btn--primary"),
     ]);
   }
   function modalRemovePasscode() {
     const form = el("form", { class: "form-grid passcode-form" });
-    form.appendChild(formRow("現在のパスコード", input("current", { type: "password", placeholder: "現在のパスコード" })));
+    form.appendChild(formRow("現在のパスコード", input("current", { type: "password", placeholder: "現在のパスコード", cls: "input--mono" })));
     openModal("パスコードを解除", [form, el("p", { class: "tiny", attrs: { style: "margin-top:12px" }, text: "暗号化を外して平文での保存に戻します。" })], [
       btn("キャンセル", "modal-close"),
       btn("解除", "submit-passcode-remove", {}, "btn btn--danger"),
@@ -1463,7 +1463,8 @@
       const form = document.querySelector(".passcode-form");
       const v = readForm(form);
       if (v.new1 !== v.new2) { flash("確認用パスコードが一致しません"); return; }
-      if (!v.new1 || v.new1.length < 4) { flash("4文字以上にしてください"); return; }
+      const ve = SECURITY.validatePass(v.new1);
+      if (ve) { flash(ve); return; }
       try {
         await SECURITY.setPasscode(v.new1, v.current);
         currentPasscode = v.new1;
@@ -1512,7 +1513,8 @@
 
     if (mode === "setup") {
       title.textContent = "ようこそ — はじめにパスコードを設定";
-      desc.textContent = "実データを入れる場合は家族専用の合言葉を設定してください（4文字以上）。スキップしても利用できます。";
+      desc.textContent = "実データを入れる場合は家族専用の合言葉を設定してください（半角英数字6文字以上）。スキップしても利用できます。";
+      input1.placeholder = "英数字6文字以上";
       input2.hidden = false;
       input2.placeholder = "もう一度入力";
       submit.textContent = "パスコードを設定";
@@ -1522,7 +1524,8 @@
       meta.appendChild(skip);
     } else {
       title.textContent = "パスコードを入力";
-      desc.textContent = "家族専用の合言葉です";
+      desc.textContent = "家族専用の合言葉（半角英数字）";
+      input1.placeholder = "パスコード";
       input2.hidden = true;
       submit.textContent = "ロック解除";
       meta.textContent = "";
@@ -1572,7 +1575,8 @@
       SECURITY.startIdleTimer(lockApp);
     } else {
       // 新規セットアップ
-      if (!p1 || p1.length < 4) { err.textContent = "4文字以上にしてください"; return; }
+      const ve = SECURITY.validatePass(p1);
+      if (ve) { err.textContent = ve; return; }
       if (p1 !== p2) { err.textContent = "確認用パスコードが一致しません"; return; }
       try {
         // 既存平文stateがあれば取り込み、新パスコードで暗号化

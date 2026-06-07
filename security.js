@@ -96,10 +96,16 @@
 
   // パスコードを新規設定 or 変更
   // 既存ステート（plainでもencでも）があれば、新パスコードで再暗号化して保存
+  const PASS_RE = /^[A-Za-z0-9]+$/;
+  const PASS_MIN = 6;
+  function validatePass(p) {
+    if (!p || p.length < PASS_MIN) return "パスコードは英数字" + PASS_MIN + "文字以上にしてください";
+    if (!PASS_RE.test(p)) return "パスコードは英字（A〜Z, a〜z）と数字（0〜9）のみ使えます";
+    return null;
+  }
   async function setPasscode(newPass, currentPass) {
-    if (!newPass || newPass.length < 4) {
-      throw new Error("パスコードは4文字以上にしてください");
-    }
+    const err = validatePass(newPass);
+    if (err) throw new Error(err);
     // 現在のstateを取り出す
     let currentState = null;
     if (isPasscodeSet()) {
@@ -231,7 +237,8 @@
   // 暗号化済みのバックアップJSONを作る（パスコードで保護）
   // ファイルに書き出して別端末で復元できる
   async function exportBackup(state, password) {
-    if (!password || password.length < 4) throw new Error("パスワード4文字以上");
+    const verr = validatePass(password);
+    if (verr) throw new Error(verr);
     const salt = rndBytes(SALT_BYTES);
     const iter = PBKDF2_ITER;
     const key = await deriveKey(password, salt, iter);
@@ -278,6 +285,8 @@
     isPasscodeSet,
     setPasscode,
     removePasscode,
+    validatePass,
+    PASS_MIN,
     loadState,
     saveState,
     verifyPasscode,
