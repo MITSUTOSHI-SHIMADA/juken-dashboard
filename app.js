@@ -531,7 +531,7 @@
   function renderOverview() {
     const root = el("div");
     const calc = reverseCalc();
-    const greeting = state.settings.role === "kid" ? "おかえり、息子。" : "ようこそ、嶋田さん。";
+    const greeting = state.settings.role === "kid" ? "おかえりなさい。" : "ようこそ、◯◯さん。";
 
     root.appendChild(el("section", { class: "card welcome" }, [
       el("h2", { text: greeting }),
