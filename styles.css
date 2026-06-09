@@ -17,11 +17,11 @@
   --ink: #3b2d36;
   --ink-soft: #6f5f68;
   --ink-faint: #ab9ba4;
-  --line: #ecdfe6;
-  --line-strong: #d8c3cd;
-  --bg: #faf5f8;
+  --line: #dde8e0;
+  --line-strong: #b8d3c1;
+  --bg: #e8f3eb;          /* 爽やかな新緑〜ミント */
   --card: #ffffff;
-  --card-soft: #fdf8fa;
+  --card-soft: #f1f8f3;
 
   /* ブランド：プラム×ローズ */
   --brand: #a8527f;
@@ -335,7 +335,7 @@ button { font: inherit; }
 .gauge {
   height: 12px;
   border-radius: 999px;
-  background: #ecdfe6;
+  background: #dde8e0;
   overflow: hidden;
   margin: 10px 0 6px;
 }
