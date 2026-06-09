@@ -1158,7 +1158,7 @@
         el("div", { class: "setting-row__desc", text: "親モード：全機能アクセス可。本人モード：管理機能は非表示。" }),
       ]),
       el("div", { class: "setting-row__actions" }, [
-        el("div", { class: "role-toggle", attrs: { style: "background:#e5efe9" } }, [
+        el("div", { class: "role-toggle", attrs: { style: "background:#e2e8f0" } }, [
           el("button", { attrs: { type: "button", "data-action": "set-role", "data-role": "parent", "aria-pressed": state.settings.role === "parent" ? "true" : "false", style: "color:" + (state.settings.role === "parent" ? "var(--brand-darker)" : "var(--ink-soft)") + ";background:" + (state.settings.role === "parent" ? "#fff" : "transparent") }, text: "👩 親" }),
           el("button", { attrs: { type: "button", "data-action": "set-role", "data-role": "kid", "aria-pressed": state.settings.role === "kid" ? "true" : "false", style: "color:" + (state.settings.role === "kid" ? "var(--brand-darker)" : "var(--ink-soft)") + ";background:" + (state.settings.role === "kid" ? "#fff" : "transparent") }, text: "👦 本人" }),
         ]),

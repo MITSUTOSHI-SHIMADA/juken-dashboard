@@ -13,31 +13,31 @@
   --red: #d6596c;
   --red-bg: #fbe6ea;
 
-  /* 文字・罫線・背景：温かみのある緑系ニュートラル */
-  --ink: #1d3328;
-  --ink-soft: #4d6857;
-  --ink-faint: #9bb1a5;
-  --line: #d4e5d9;
-  --line-strong: #afcdb9;
-  --bg: #e8f3eb;          /* 爽やかな新緑〜ミント */
+  /* 文字・罫線・背景：クールなブルー系ニュートラル */
+  --ink: #1e293b;
+  --ink-soft: #475569;
+  --ink-faint: #94a3b8;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --bg: #f7f9fc;          /* オフホワイト（ほんのり青み） */
   --card: #ffffff;
-  --card-soft: #f1f8f3;
+  --card-soft: #f1f5f9;
 
-  /* ブランド：フレッシュエメラルド×深緑（爽やか系） */
-  --brand: #2f7d54;
-  --brand-dark: #1f5c3c;
-  --brand-darker: #133e29;
-  --brand-soft: #dbeede;
-  --brand-light: #7eb89a;
+  /* ブランド：クリアブルー（明るめSaaSトーン） */
+  --brand: #3b82f6;
+  --brand-dark: #2563eb;
+  --brand-darker: #1e40af;
+  --brand-soft: #e0edff;
+  --brand-light: #93c5fd;
 
   --sidebar-w: 240px;
   --topbar-h: 64px;
 
   --radius: 14px;
   --radius-sm: 10px;
-  --shadow-sm: 0 1px 2px rgba(19, 62, 41, 0.06);
-  --shadow:    0 1px 3px rgba(19, 62, 41, 0.08), 0 8px 24px rgba(19, 62, 41, 0.06);
-  --shadow-lg: 0 10px 30px rgba(19, 62, 41, 0.18);
+  --shadow-sm: 0 1px 2px rgba(30, 64, 175, 0.05);
+  --shadow:    0 1px 3px rgba(30, 64, 175, 0.08), 0 8px 24px rgba(30, 64, 175, 0.06);
+  --shadow-lg: 0 10px 30px rgba(30, 64, 175, 0.16);
 }
 
 * { box-sizing: border-box; }
@@ -66,8 +66,8 @@ button { font: inherit; }
 
 /* ---------- サイドバー ---------- */
 .sidebar {
-  background: linear-gradient(180deg, var(--brand-darker) 0%, var(--brand-dark) 100%);
-  color: #f6e9ef;
+  background: linear-gradient(180deg, var(--brand) 0%, var(--brand-dark) 100%);
+  color: #eaf2ff;
   display: flex;
   flex-direction: column;
   padding: 18px 12px;
@@ -102,7 +102,7 @@ button { font: inherit; }
   appearance: none;
   border: 0;
   background: transparent;
-  color: #f6e9ef;
+  color: #eaf2ff;
   text-align: left;
   padding: 10px 12px;
   border-radius: 10px;
@@ -151,7 +151,7 @@ button { font: inherit; }
   appearance: none;
   border: 0;
   background: transparent;
-  color: #f6e9ef;
+  color: #eaf2ff;
   font-weight: 700;
   font-size: 0.78rem;
   padding: 6px 10px;
@@ -167,7 +167,7 @@ button { font: inherit; }
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.08);
-  color: #f6e9ef;
+  color: #eaf2ff;
   font-weight: 700;
   font-size: 0.82rem;
   padding: 8px 12px;
@@ -335,7 +335,7 @@ button { font: inherit; }
 .gauge {
   height: 12px;
   border-radius: 999px;
-  background: #dde8e0;
+  background: #e2e8f0;
   overflow: hidden;
   margin: 10px 0 6px;
 }
@@ -521,7 +521,7 @@ button { font: inherit; }
   max-width: 360px;
   border-radius: 12px;
 }
-.add-btn:hover { background: #cce4d4; }
+.add-btn:hover { background: #cee2fa; }
 
 /* =============================================================
  * フォーム
@@ -612,7 +612,7 @@ button { font: inherit; }
   padding: 6px;
   border: 1px dashed var(--line-strong);
   border-radius: 10px;
-  background: #f6fcf8;
+  background: #f7fafd;
 }
 .p-chip {
   display: inline-flex;
@@ -645,7 +645,7 @@ button { font: inherit; }
   font-weight: 800;
   padding: 2px 9px;
   border-radius: 999px;
-  background: #e5efe9;
+  background: #e2e8f0;
   color: var(--ink-soft);
 }
 
@@ -680,7 +680,7 @@ button { font: inherit; }
 .slot--free  .slot__body { background: #fff; border-style: dashed; color: var(--ink-faint); }
 .slot--study .slot__body {
   background: var(--brand-soft);
-  border-color: #b6d8c2;
+  border-color: #b6d2f7;
 }
 .slot__label {
   font-weight: 700;
@@ -839,7 +839,7 @@ button { font: inherit; }
 .modal__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(19, 62, 41, 0.45);
+  background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(2px);
 }
 .modal__card {
@@ -1097,7 +1097,7 @@ button { font: inherit; }
 
 /* ダッシュボードのウェルカム */
 .welcome {
-  background: linear-gradient(135deg, var(--brand-soft) 0%, #cee7d6 100%);
+  background: linear-gradient(135deg, var(--brand-soft) 0%, #c9def9 100%);
   border: 1px solid #b6d8c2;
   padding: 20px 24px;
 }
