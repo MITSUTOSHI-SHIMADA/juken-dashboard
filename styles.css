@@ -13,31 +13,31 @@
   --red: #d6596c;
   --red-bg: #fbe6ea;
 
-  /* 文字・罫線・背景：温かみのあるニュートラル */
-  --ink: #3b2d36;
-  --ink-soft: #6f5f68;
-  --ink-faint: #ab9ba4;
-  --line: #dde8e0;
-  --line-strong: #b8d3c1;
+  /* 文字・罫線・背景：温かみのある緑系ニュートラル */
+  --ink: #1d3328;
+  --ink-soft: #4d6857;
+  --ink-faint: #9bb1a5;
+  --line: #d4e5d9;
+  --line-strong: #afcdb9;
   --bg: #e8f3eb;          /* 爽やかな新緑〜ミント */
   --card: #ffffff;
   --card-soft: #f1f8f3;
 
-  /* ブランド：プラム×ローズ */
-  --brand: #a8527f;
-  --brand-dark: #6e2b58;
-  --brand-darker: #4a1f3b;
-  --brand-soft: #f8ecf3;
-  --brand-light: #c77b9e;
+  /* ブランド：フレッシュエメラルド×深緑（爽やか系） */
+  --brand: #2f7d54;
+  --brand-dark: #1f5c3c;
+  --brand-darker: #133e29;
+  --brand-soft: #dbeede;
+  --brand-light: #7eb89a;
 
   --sidebar-w: 240px;
   --topbar-h: 64px;
 
   --radius: 14px;
   --radius-sm: 10px;
-  --shadow-sm: 0 1px 2px rgba(74, 36, 56, 0.06);
-  --shadow:    0 1px 3px rgba(74, 36, 56, 0.08), 0 8px 24px rgba(74, 36, 56, 0.07);
-  --shadow-lg: 0 10px 30px rgba(74, 36, 56, 0.18);
+  --shadow-sm: 0 1px 2px rgba(19, 62, 41, 0.06);
+  --shadow:    0 1px 3px rgba(19, 62, 41, 0.08), 0 8px 24px rgba(19, 62, 41, 0.06);
+  --shadow-lg: 0 10px 30px rgba(19, 62, 41, 0.18);
 }
 
 * { box-sizing: border-box; }
@@ -521,7 +521,7 @@ button { font: inherit; }
   max-width: 360px;
   border-radius: 12px;
 }
-.add-btn:hover { background: #f0d9e6; }
+.add-btn:hover { background: #cce4d4; }
 
 /* =============================================================
  * フォーム
@@ -612,7 +612,7 @@ button { font: inherit; }
   padding: 6px;
   border: 1px dashed var(--line-strong);
   border-radius: 10px;
-  background: #fefafc;
+  background: #f6fcf8;
 }
 .p-chip {
   display: inline-flex;
@@ -645,7 +645,7 @@ button { font: inherit; }
   font-weight: 800;
   padding: 2px 9px;
   border-radius: 999px;
-  background: #f1ebee;
+  background: #e5efe9;
   color: var(--ink-soft);
 }
 
@@ -680,7 +680,7 @@ button { font: inherit; }
 .slot--free  .slot__body { background: #fff; border-style: dashed; color: var(--ink-faint); }
 .slot--study .slot__body {
   background: var(--brand-soft);
-  border-color: #ecc6dc;
+  border-color: #b6d8c2;
 }
 .slot__label {
   font-weight: 700;
@@ -839,7 +839,7 @@ button { font: inherit; }
 .modal__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(58, 26, 44, 0.45);
+  background: rgba(19, 62, 41, 0.45);
   backdrop-filter: blur(2px);
 }
 .modal__card {
@@ -1097,8 +1097,8 @@ button { font: inherit; }
 
 /* ダッシュボードのウェルカム */
 .welcome {
-  background: linear-gradient(135deg, var(--brand-soft) 0%, #fbeef4 100%);
-  border: 1px solid #ecc6dc;
+  background: linear-gradient(135deg, var(--brand-soft) 0%, #cee7d6 100%);
+  border: 1px solid #b6d8c2;
   padding: 20px 24px;
 }
 .welcome h2 {
