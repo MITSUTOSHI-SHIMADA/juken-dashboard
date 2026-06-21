@@ -131,6 +131,17 @@
       return isFinite(n) ? Math.max(m, n) : m;
     }, 0);
 
+    // 曜日ごとの「計画された科目」（カリキュラム・モデル）
+    const SCHEDULED_BY_DOW = {
+      0: [],                                  // 日：休み
+      1: ["英語"],                              // 月：英単語
+      2: ["数学", "物理"],                       // 火：数物
+      3: ["英語", "化学"],                       // 水
+      4: ["国語", "化学"],                       // 木
+      5: ["英語", "数学"],                       // 金
+      6: ["数学", "物理", "化学", "英語"],         // 土：4科
+    };
+
     // 過去30日のダミーログ（カレンダー表示用・実データ運用時は徐々に実値で置換される）
     const dailyLog = {};
     const t = today();
@@ -138,20 +149,32 @@
       const d = addDays(t, -i);
       const key = fmtDate(d);
       const dow = d.getUTCDay();
-      const isCram = dow === 2 || dow === 4 || dow === 6; // 火・木・土
-      const isRest = dow === 0; // 日曜は軽め
-      const completed = isRest ? Math.floor(Math.random() * 3) :
-                        isCram ? 6 + Math.floor(Math.random() * 5) :
-                                 3 + Math.floor(Math.random() * 4);
-      const graded = isRest ? 0 :
-                     isCram ? 4 + Math.floor(Math.random() * 3) :
-                              1 + Math.floor(Math.random() * 3);
+      const planned = SCHEDULED_BY_DOW[dow] || [];
+      // 90%の確率で計画通りに実施。10%は1科目だけ抜ける
+      const did = planned.filter(function () { return Math.random() < 0.9; });
+      const subjects = {};
+      let total = 0;
+      did.forEach(function (s) {
+        const n = 1 + Math.floor(Math.random() * 4);
+        subjects[s] = n;
+        total += n;
+      });
+      const graded = Math.floor(total * (0.3 + Math.random() * 0.3));
       dailyLog[key] = {
-        completed: completed,
+        completed: total,
         graded: graded,
         mastered: Math.random() < 0.12 ? 1 : 0,
+        subjects: subjects,
       };
     }
+
+    // テスト予定（デモ用：今後3ヶ月の模試・学校テスト）
+    const testSchedule = [
+      { id: "t1", date: fmtDate(addDays(t, 14)), name: "第4回 全統記述模試", type: "mock" },
+      { id: "t2", date: fmtDate(addDays(t, 30)), name: "高校 期末試験", type: "school" },
+      { id: "t3", date: fmtDate(addDays(t, 60)), name: "オープン模試（駿台）", type: "mock" },
+      { id: "t4", date: fmtDate(addDays(t, 7)),  name: "塾の小テスト（化学）", type: "practice" },
+    ];
 
     return {
       schemaVersion: 5,
@@ -171,9 +194,54 @@
       completedToday: {},
       completedDate: todayISO(),
       dailyLog: dailyLog,
+      testSchedule: testSchedule,
+      nextTestId: 5,
       settings: { role: "parent" },
       lastSaved: null,
     };
+  }
+
+  // 科目→色のマッピング（カレンダーの可視化用）
+  const SUBJECT_COLOR = {
+    "英語": "#3b82f6",
+    "数学": "#f59e0b",
+    "国語": "#ef4444",
+    "物理": "#8b5cf6",
+    "化学": "#10b981",
+    "社会": "#ec4899",
+  };
+
+  // テスト種別→アイコン/色
+  const TEST_TYPE = {
+    mock:     { icon: "📝", label: "模試",       bg: "#fef3c7", color: "#92400e" },
+    school:   { icon: "🏫", label: "学校テスト", bg: "#fed7aa", color: "#9a3412" },
+    practice: { icon: "📖", label: "演習",       bg: "#bfdbfe", color: "#1e3a8a" },
+    other:    { icon: "📌", label: "予定",       bg: "#e2e8f0", color: "#334155" },
+  };
+
+  // 日次ログの科目別+1/-1
+  function bumpDailySubject(subject, delta) {
+    if (!subject) return;
+    const key = todayISO();
+    if (!state.dailyLog[key]) state.dailyLog[key] = { completed: 0, graded: 0, mastered: 0, subjects: {} };
+    if (!state.dailyLog[key].subjects) state.dailyLog[key].subjects = {};
+    const cur = state.dailyLog[key].subjects[subject] || 0;
+    const next = Math.max(0, cur + delta);
+    if (next === 0) delete state.dailyLog[key].subjects[subject];
+    else state.dailyLog[key].subjects[subject] = next;
+  }
+
+  // 今日の計画科目（todaySchedule の学習スロットから抽出）
+  function plannedSubjectsToday() {
+    const set = {};
+    state.todaySchedule.forEach(function (slot) {
+      if (slot.type !== "study") return;
+      (slot.problems || []).forEach(function (pid) {
+        const r = reviewById(pid);
+        if (r) set[r.subject] = true;
+      });
+    });
+    return Object.keys(set);
   }
 
   // 日次ロールオーバー：日付が変わったら completedToday をクリア
@@ -296,6 +364,7 @@
     const base = today();
     let nextDays;
     bumpDailyLog("graded", 1);
+    bumpDailySubject(r.subject, 1);
     if (result === "○") {
       if (r.intervalStage >= MAX_STAGE) {
         r.mastered = true;
@@ -325,12 +394,16 @@
   }
 
   async function toggleProblem(id) {
+    const r = reviewById(id);
+    const subj = r ? r.subject : null;
     if (state.completedToday[id]) {
       delete state.completedToday[id];
       bumpDailyLog("completed", -1);
+      bumpDailySubject(subj, -1);
     } else {
       state.completedToday[id] = true;
       bumpDailyLog("completed", 1);
+      bumpDailySubject(subj, 1);
     }
     await saveState(); render();
   }
@@ -1100,7 +1173,7 @@
     return 4;
   }
 
-  // 特別な日（試験日・模試日）のマップ
+  // 特別な日（試験日・模試日・テスト予定）のマップ
   function specialDays() {
     const m = {};
     function add(date, item) {
@@ -1109,11 +1182,15 @@
       m[date].push(item);
     }
     state.schools.forEach(function (s) {
-      add(s.examDate,       { type: "exam",   icon: "🎯", label: s.name + " 試験日" });
-      add(s.commonTestDate, { type: "common", icon: "📋", label: s.name + " 共通テスト" });
+      add(s.examDate,       { type: "exam",   icon: "🎯", label: s.name + " 試験日", bg: "#fee2e2", color: "#991b1b" });
+      add(s.commonTestDate, { type: "common", icon: "📋", label: s.name + " 共通テスト", bg: "#fecaca", color: "#7f1d1d" });
     });
     state.examResults.forEach(function (e) {
-      add(e.date, { type: "mock", icon: "📝", label: e.name + "（" + (e.grade || "") + "判定）" });
+      add(e.date, { type: "mock-done", icon: "📝", label: e.name + "（" + (e.grade || "") + "判定）", bg: "#dbeafe", color: "#1e3a8a" });
+    });
+    (state.testSchedule || []).forEach(function (t) {
+      const meta = TEST_TYPE[t.type] || TEST_TYPE.other;
+      add(t.date, { type: "test", icon: meta.icon, label: t.name, bg: meta.bg, color: meta.color, id: t.id, editable: true });
     });
     return m;
   }
@@ -1173,10 +1250,115 @@
     }
     root.appendChild(legend);
 
+    // 科目凡例
+    root.appendChild(renderSubjectLegend());
+
     // サマリ（表示中の範囲の合計）
     root.appendChild(renderRangeSummary());
 
+    // テスト予定リスト
+    root.appendChild(renderTestList());
+
     return root;
+  }
+
+  function renderSubjectLegend() {
+    const row = el("div", { class: "cal-legend tiny" });
+    row.appendChild(el("span", { text: "科目：" }));
+    Object.keys(SUBJECT_COLOR).slice(0, 5).forEach(function (s) {
+      const col = SUBJECT_COLOR[s];
+      row.appendChild(el("span", {
+        class: "subj-chip done",
+        attrs: { style: "border-color:" + col + ";background:" + col + "1a;padding:1px 8px" },
+      }, [
+        el("span", { class: "dot", attrs: { style: "background:" + col } }),
+        el("span", { text: s }),
+      ]));
+    });
+    row.appendChild(el("span", { class: "subj-chip undone", attrs: { style: "padding:1px 8px" } }, [
+      el("span", { class: "dot" }),
+      el("span", { text: "未実施" }),
+    ]));
+    return row;
+  }
+
+  function renderTestList() {
+    const c = el("section", { class: "card" });
+    c.appendChild(el("div", { class: "list-head" }, [
+      el("h4", { text: "📝 テスト・模試の予定" }),
+      btn("＋ 追加", "new-test", {}, "btn btn--small btn--primary"),
+    ]));
+    const upcoming = (state.testSchedule || []).slice().sort(function (a, b) {
+      return parseDate(a.date) - parseDate(b.date);
+    });
+    if (upcoming.length === 0) {
+      c.appendChild(el("p", { class: "muted", text: "登録された予定はありません。「＋ 追加」から登録してください。" }));
+      return c;
+    }
+    const list = el("ul", { class: "test-list" });
+    const t = today();
+    upcoming.forEach(function (te) {
+      const d = parseDate(te.date);
+      const days = daysBetween(t, d);
+      const past = days < 0;
+      const meta = TEST_TYPE[te.type] || TEST_TYPE.other;
+      list.appendChild(el("li", { class: "test-row" + (past ? " is-past" : "") }, [
+        el("div", { class: "test-row__icon", attrs: { style: "background:" + meta.bg + ";color:" + meta.color }, text: meta.icon }),
+        el("div", { class: "test-row__main" }, [
+          el("div", { class: "test-row__name", text: te.name }),
+          el("div", { class: "test-row__meta", text: te.date + "（" + meta.label + "）" + (past ? "：終了" : "：あと " + days + " 日") }),
+        ]),
+        el("div", { class: "test-row__actions" }, [
+          iconBtn("✏️", "edit-test", { id: te.id }, "編集"),
+          iconBtn("🗑️", "delete-test", { id: te.id }, "削除"),
+        ]),
+      ]));
+    });
+    c.appendChild(list);
+    return c;
+  }
+
+  function modalTest(test) {
+    const isNew = !test;
+    const cur = test || { date: todayISO(), name: "", type: "mock" };
+    const form = el("form", { class: "form-grid test-form", attrs: { "data-id": cur.id || "" } });
+    form.appendChild(formRow("日付", input("date", { type: "date", value: cur.date })));
+    form.appendChild(formRow("名称", input("name", { value: cur.name, placeholder: "例：第4回 全統模試" })));
+    form.appendChild(formRow("種別", select("type", [
+      { label: "📝 模試", value: "mock" },
+      { label: "🏫 学校テスト", value: "school" },
+      { label: "📖 演習・自宅模試", value: "practice" },
+      { label: "📌 その他", value: "other" },
+    ], cur.type)));
+    openModal(isNew ? "テスト予定を追加" : "テスト予定を編集", [form], [
+      btn("キャンセル", "modal-close"),
+      btn(isNew ? "追加" : "保存", "submit-test", { id: cur.id || "" }, "btn btn--primary"),
+    ]);
+  }
+
+  async function saveTest(values, id) {
+    if (!values.date || !values.name) { flash("日付と名称は必須です"); return false; }
+    if (!state.testSchedule) state.testSchedule = [];
+    const v = { date: values.date, name: values.name, type: values.type || "mock" };
+    if (id) {
+      const i = state.testSchedule.findIndex(function (t) { return t.id === id; });
+      if (i >= 0) state.testSchedule[i] = Object.assign(state.testSchedule[i], v);
+    } else {
+      v.id = "t" + (state.nextTestId || 1);
+      state.nextTestId = (state.nextTestId || 1) + 1;
+      state.testSchedule.push(v);
+    }
+    state.testSchedule.sort(function (a, b) { return parseDate(a.date) - parseDate(b.date); });
+    await saveState(); closeModal(); render();
+    flash(id ? "予定を更新しました" : "予定を追加しました");
+    return true;
+  }
+
+  async function deleteTest(id) {
+    if (!window.confirm("この予定を削除しますか？")) return;
+    state.testSchedule = state.testSchedule.filter(function (t) { return t.id !== id; });
+    await saveState(); render();
+    flash("予定を削除しました");
   }
 
   function renderMonthGrid() {
@@ -1252,44 +1434,100 @@
     if (dow === 6) cls.push("is-sat");
     const node = el("div", { class: cls.join(" ") });
 
+    // テストバー（最上部）
+    if (specials.length) {
+      const bars = el("div", { class: "cal-test-bars" });
+      specials.forEach(function (s) {
+        bars.appendChild(el("div", {
+          class: "cal-test-bar",
+          attrs: { style: "background:" + (s.bg || "#e2e8f0") + ";color:" + (s.color || "#334155"), title: s.label },
+        }, [
+          el("span", { text: s.icon + " " }),
+          el("span", { class: "cal-test-bar__label", text: s.label }),
+        ]));
+      });
+      node.appendChild(bars);
+    }
+
     // 日付
     const dayLine = el("div", { class: "cal-day-line" }, [
       el("span", { class: "cal-day-num", text: String(cell.date.getUTCDate()) }),
-      specials.length ? el("span", { class: "cal-special", attrs: { title: specials.map(function (s) { return s.label; }).join(" / ") } },
-        specials.slice(0, 3).map(function (s) { return el("span", { text: s.icon }); })) : null,
     ]);
     node.appendChild(dayLine);
 
-    // 進捗の中身
-    if (log && (log.completed || log.graded || log.mastered)) {
-      if (detailed) {
-        const stats = el("div", { class: "cal-week-stats" }, [
-          el("span", {}, [el("strong", { text: String(log.completed || 0) }), el("span", { text: "問完了" })]),
-          el("span", {}, [el("strong", { text: String(log.graded || 0) }), el("span", { text: "問採点" })]),
-          log.mastered ? el("span", { class: "cal-mastered", text: "🎉 習得+" + log.mastered }) : null,
-        ]);
-        node.appendChild(stats);
-      } else {
+    // 進捗の中身（科目別の可視化）
+    const subjects = log && log.subjects ? log.subjects : null;
+    const subjectKeys = subjects ? Object.keys(subjects) : [];
+
+    if (detailed) {
+      // 週ビュー：科目チップを並べる（実施は色付き＋数字、計画外/未実施は灰色）
+      const isFutureOrToday = dateISO >= todayISO();
+      const planned = isToday ? plannedSubjectsToday() : [];
+      const plannedNotDone = isToday
+        ? planned.filter(function (s) { return !subjectKeys.length || !subjects[s]; })
+        : [];
+
+      if (subjectKeys.length || plannedNotDone.length) {
+        const chips = el("div", { class: "cal-subj-list" });
+        subjectKeys.forEach(function (s) {
+          const col = SUBJECT_COLOR[s] || "#64748b";
+          chips.appendChild(el("span", {
+            class: "subj-chip done",
+            attrs: { style: "border-color:" + col + ";background:" + col + "1a" },
+          }, [
+            el("span", { class: "dot", attrs: { style: "background:" + col } }),
+            el("span", { text: s }),
+            el("strong", { text: " " + subjects[s] }),
+          ]));
+        });
+        plannedNotDone.forEach(function (s) {
+          chips.appendChild(el("span", { class: "subj-chip undone" }, [
+            el("span", { class: "dot" }),
+            el("span", { text: s }),
+            el("span", { class: "tiny", text: " 未" }),
+          ]));
+        });
+        node.appendChild(chips);
+      } else if (log && (log.completed || log.graded)) {
+        // 旧データ（科目情報なし）
+        node.appendChild(el("div", { class: "cal-week-stats" }, [
+          el("span", { text: (log.completed || 0) + " 問完了 / " + (log.graded || 0) + " 採点" }),
+        ]));
+      } else if (!cell.isOut && !specials.length) {
+        node.appendChild(el("div", { class: "cal-week-empty muted", text: isFutureOrToday ? "（予定なし）" : "— 記録なし" }));
+      }
+
+      // 統計サブテキスト
+      if (log && (log.completed || log.graded || log.mastered)) {
+        const sub = el("div", { class: "cal-week-stats-bar" });
+        sub.appendChild(el("span", { text: "完了 " }));
+        sub.appendChild(el("strong", { text: String(log.completed || 0) }));
+        sub.appendChild(el("span", { text: " / 採点 " }));
+        sub.appendChild(el("strong", { text: String(log.graded || 0) }));
+        if (log.mastered) {
+          sub.appendChild(el("span", { class: "cal-mastered", text: " 🎉+" + log.mastered }));
+        }
+        node.appendChild(sub);
+      }
+    } else {
+      // 月ビュー：科目を小さなドットで表示
+      if (subjectKeys.length) {
+        const dots = el("div", { class: "cal-subj-dots" });
+        subjectKeys.slice(0, 5).forEach(function (s) {
+          const col = SUBJECT_COLOR[s] || "#64748b";
+          dots.appendChild(el("span", {
+            class: "subj-dot",
+            attrs: { style: "background:" + col, title: s + " " + subjects[s] + "問" },
+          }));
+        });
+        node.appendChild(dots);
+      }
+      if (log && (log.completed || log.graded)) {
         node.appendChild(el("div", { class: "cal-month-stats" }, [
           el("span", { text: "✓" + (log.completed || 0) }),
-          el("span", { text: "/" }),
-          el("span", { text: "○" + (log.graded || 0) }),
+          log.graded ? el("span", { class: "tiny", text: " / ○" + log.graded }) : null,
         ]));
       }
-    } else if (detailed) {
-      node.appendChild(el("div", { class: "cal-week-empty muted", text: "— 記録なし" }));
-    }
-
-    // 特別日の詳細
-    if (detailed && specials.length) {
-      const sx = el("div", { class: "cal-week-specials" });
-      specials.forEach(function (s) {
-        sx.appendChild(el("div", { class: "cal-special-row" }, [
-          el("span", { text: s.icon + " " }),
-          el("span", { text: s.label }),
-        ]));
-      });
-      node.appendChild(sx);
     }
 
     return node;
@@ -1806,6 +2044,16 @@
     if (action === "export") { await exportBackup(); return; }
     if (action === "import") { await importBackup(); return; }
     if (action === "reset")  { await resetData(); return; }
+
+    // テスト予定 CRUD
+    if (action === "new-test")    { modalTest(null); return; }
+    if (action === "edit-test")   { modalTest((state.testSchedule || []).find(function (t) { return t.id === dataset.id; })); return; }
+    if (action === "delete-test") { await deleteTest(dataset.id); return; }
+    if (action === "submit-test") {
+      const form = document.querySelector(".test-form");
+      await saveTest(readForm(form), dataset.id || null);
+      return;
+    }
 
     // カレンダー
     if (action === "cal-view")  { ui.cal.view = dataset.view; render(); return; }

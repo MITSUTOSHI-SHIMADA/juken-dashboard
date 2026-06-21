@@ -1284,6 +1284,125 @@ button { font: inherit; }
 .intens-chip.intensity-4,
 .intens-chip.intensity-3 { color: #fff; }
 
+/* テストバー（セル上部） */
+.cal-test-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.cal-test-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.cal-test-bar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-cell-wk .cal-test-bar {
+  font-size: 0.78rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* 月セルの科目ドット */
+.cal-subj-dots {
+  display: flex;
+  gap: 2px;
+  margin-top: auto;
+}
+.subj-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* 週セルの科目チップリスト */
+.cal-subj-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.subj-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: #fff;
+}
+.subj-chip .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  background: #cbd5e1;
+}
+.subj-chip.done { color: var(--ink); }
+.subj-chip.undone {
+  color: var(--ink-faint);
+  border-color: var(--line-strong);
+  border-style: dashed;
+  background: transparent;
+}
+
+.cal-week-stats-bar {
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.cal-week-stats-bar strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+/* テスト予定一覧 */
+.test-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.test-row.is-past { opacity: 0.55; }
+.test-row__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  flex: none;
+}
+.test-row__main { flex: 1; min-width: 0; }
+.test-row__name { font-weight: 700; color: var(--ink); }
+.test-row__meta { font-size: 0.78rem; color: var(--ink-soft); }
+.test-row__actions { display: flex; gap: 4px; flex: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .btn, .flash, .gauge > span, .sidebar { transition: none; }
 }
