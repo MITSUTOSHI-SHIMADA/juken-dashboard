@@ -1111,6 +1111,179 @@ button { font: inherit; }
   color: var(--ink-soft);
 }
 
+/* =============================================================
+ * カレンダー（週次・月次）
+ * ============================================================= */
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+}
+.cal-tabs, .cal-nav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cal-title {
+  font-weight: 800;
+  font-size: 1rem;
+  min-width: 140px;
+  text-align: center;
+  color: var(--ink);
+}
+
+/* 月グリッド */
+.cal-month {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-weekday {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 6px 0;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.cal-weekday.is-sun { color: var(--red); }
+.cal-weekday.is-sat { color: var(--brand); }
+
+.cal-cell {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 6px 6px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--card);
+  font-size: 0.78rem;
+}
+.cal-cell.is-out { opacity: 0.35; }
+.cal-cell.is-today {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+.cal-day-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.cal-day-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.cal-cell.is-sun .cal-day-num { color: var(--red); }
+.cal-cell.is-sat .cal-day-num { color: var(--brand); }
+.cal-special {
+  display: inline-flex;
+  gap: 1px;
+  font-size: 0.78rem;
+}
+.cal-month-stats {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  display: inline-flex;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+  margin-top: auto;
+}
+.cal-cell.intensity-4 .cal-day-num,
+.cal-cell.intensity-4 .cal-month-stats { color: #fff; }
+.cal-cell.intensity-3 .cal-month-stats { color: rgba(255,255,255,0.85); }
+
+/* 強度カラー（ブランドブルーの濃淡） */
+.intensity-0 { background: var(--card); }
+.intensity-1 { background: rgba(59, 130, 246, 0.12); }
+.intensity-2 { background: rgba(59, 130, 246, 0.28); }
+.intensity-3 { background: rgba(59, 130, 246, 0.55); }
+.intensity-4 { background: rgba(59, 130, 246, 0.85); color: #fff; }
+.intensity-3.cal-cell .cal-day-num { color: #fff; }
+
+/* 週グリッド：縦並びでもっと詳細 */
+.cal-week {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 760px) {
+  .cal-week { grid-template-columns: repeat(7, 1fr); }
+}
+.cal-cell-wk {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 130px;
+}
+.cal-cell-wk.is-today { outline: 2px solid var(--brand); outline-offset: -2px; }
+.cal-cell-wk.is-out  { opacity: 0.5; }
+.cal-cell-wk.is-sun  .cal-day-num { color: var(--red); }
+.cal-cell-wk.is-sat  .cal-day-num { color: var(--brand); }
+.cal-week-stats {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  gap: 2px;
+}
+.cal-week-stats strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  margin-right: 4px;
+}
+.cal-week-empty { font-size: 0.74rem; }
+.cal-mastered {
+  color: var(--green);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+.cal-week-specials {
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 0.74rem;
+}
+.cal-special-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--ink-soft);
+}
+
+/* 凡例 */
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  flex-wrap: wrap;
+}
+.intens-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.intens-chip.intensity-4,
+.intens-chip.intensity-3 { color: #fff; }
+
 @media (prefers-reduced-motion: reduce) {
   .btn, .flash, .gauge > span, .sidebar { transition: none; }
 }

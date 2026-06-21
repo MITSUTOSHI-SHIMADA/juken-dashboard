@@ -19,8 +19,9 @@ window.STUDENT_DATA = {
     examType: "大学受験（国公立・理系）",
   },
 
-  // モックを「いつ開いても同じ起点」にする基準日。null で当日。
-  referenceDate: "2026-06-06",
+  // 基準日。null にすると常に実際の今日の日付で動く（実運用デフォルト）。
+  // 特定の日を固定したい時だけ "YYYY-MM-DD" を指定。
+  referenceDate: null,
 
   // ===== 志望校 =====
   schools: [

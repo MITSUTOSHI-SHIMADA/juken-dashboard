@@ -28,6 +28,7 @@
     { id: "subjects", label: "科目・成績",     icon: "📚", roles: ["parent", "kid"] },
     { id: "today",    label: "今日のタスク",   icon: "📅", roles: ["parent", "kid"] },
     { id: "review",   label: "解き直しキュー", icon: "🔁", roles: ["parent", "kid"] },
+    { id: "calendar", label: "カレンダー",     icon: "📆", roles: ["parent", "kid"] },
     { id: "weekly",   label: "週次レビュー",   icon: "📈", roles: ["parent", "kid"] },
     { id: "settings", label: "設定",           icon: "⚙️", roles: ["parent"] },
   ];
@@ -129,6 +130,29 @@
       const n = parseInt(String(r.id).slice(1), 10);
       return isFinite(n) ? Math.max(m, n) : m;
     }, 0);
+
+    // 過去30日のダミーログ（カレンダー表示用・実データ運用時は徐々に実値で置換される）
+    const dailyLog = {};
+    const t = today();
+    for (let i = 1; i <= 30; i++) {
+      const d = addDays(t, -i);
+      const key = fmtDate(d);
+      const dow = d.getUTCDay();
+      const isCram = dow === 2 || dow === 4 || dow === 6; // 火・木・土
+      const isRest = dow === 0; // 日曜は軽め
+      const completed = isRest ? Math.floor(Math.random() * 3) :
+                        isCram ? 6 + Math.floor(Math.random() * 5) :
+                                 3 + Math.floor(Math.random() * 4);
+      const graded = isRest ? 0 :
+                     isCram ? 4 + Math.floor(Math.random() * 3) :
+                              1 + Math.floor(Math.random() * 3);
+      dailyLog[key] = {
+        completed: completed,
+        graded: graded,
+        mastered: Math.random() < 0.12 ? 1 : 0,
+      };
+    }
+
     return {
       schemaVersion: 5,
       profile:     deepClone(SEED.profile),
@@ -145,9 +169,29 @@
       nextSchoolId: SEED.schools.length + 1,
       nextMaterialId: SEED.materials.length + 1,
       completedToday: {},
+      completedDate: todayISO(),
+      dailyLog: dailyLog,
       settings: { role: "parent" },
       lastSaved: null,
     };
+  }
+
+  // 日次ロールオーバー：日付が変わったら completedToday をクリア
+  function rolloverIfNeeded(s) {
+    if (!s) return s;
+    if (!s.dailyLog) s.dailyLog = {};
+    if (s.completedDate !== todayISO()) {
+      s.completedToday = {};
+      s.completedDate = todayISO();
+    }
+    return s;
+  }
+
+  // 日次ログに +1/−1
+  function bumpDailyLog(field, delta) {
+    const key = todayISO();
+    if (!state.dailyLog[key]) state.dailyLog[key] = { completed: 0, graded: 0, mastered: 0 };
+    state.dailyLog[key][field] = Math.max(0, (state.dailyLog[key][field] || 0) + delta);
   }
 
   async function saveState() {
@@ -162,7 +206,7 @@
       const raw = await SECURITY.loadState(currentPasscode);
       if (!raw) return null;
       if (raw.schemaVersion !== 5) return null;
-      return raw;
+      return rolloverIfNeeded(raw);
     } catch (e) { return null; }
   }
 
@@ -251,11 +295,13 @@
     if (!r || r.mastered) return;
     const base = today();
     let nextDays;
+    bumpDailyLog("graded", 1);
     if (result === "○") {
       if (r.intervalStage >= MAX_STAGE) {
         r.mastered = true;
         r.lastResult = "○";
         state.completedToday[id] = true;
+        bumpDailyLog("mastered", 1);
         await saveState(); render();
         flash(r.subject + "「" + r.problem + "」を習得済みに 🎉");
         return;
@@ -279,8 +325,13 @@
   }
 
   async function toggleProblem(id) {
-    if (state.completedToday[id]) delete state.completedToday[id];
-    else state.completedToday[id] = true;
+    if (state.completedToday[id]) {
+      delete state.completedToday[id];
+      bumpDailyLog("completed", -1);
+    } else {
+      state.completedToday[id] = true;
+      bumpDailyLog("completed", 1);
+    }
     await saveState(); render();
   }
   async function bumpMaterial(id, delta) {
@@ -1029,6 +1080,270 @@
   }
 
   /* =============================================================
+   * ページ：カレンダー（週次・月次）
+   * ============================================================= */
+
+  // 月の最初の日曜の日付を返す
+  function startOfWeek(d) {
+    const dow = d.getUTCDay();
+    return new Date(d.getTime() - dow * 86400000);
+  }
+
+  // 進捗強度を 0〜4 に正規化
+  function intensityOf(log) {
+    if (!log) return 0;
+    const total = (log.completed || 0) + (log.graded || 0);
+    if (total === 0) return 0;
+    if (total < 5)  return 1;
+    if (total < 10) return 2;
+    if (total < 16) return 3;
+    return 4;
+  }
+
+  // 特別な日（試験日・模試日）のマップ
+  function specialDays() {
+    const m = {};
+    function add(date, item) {
+      if (!date) return;
+      if (!m[date]) m[date] = [];
+      m[date].push(item);
+    }
+    state.schools.forEach(function (s) {
+      add(s.examDate,       { type: "exam",   icon: "🎯", label: s.name + " 試験日" });
+      add(s.commonTestDate, { type: "common", icon: "📋", label: s.name + " 共通テスト" });
+    });
+    state.examResults.forEach(function (e) {
+      add(e.date, { type: "mock", icon: "📝", label: e.name + "（" + (e.grade || "") + "判定）" });
+    });
+    return m;
+  }
+
+  function renderCalendar() {
+    const root = el("div");
+
+    // ui.cal の初期化
+    if (!ui.cal) {
+      const t = today();
+      ui.cal = {
+        view: "month",
+        year: t.getUTCFullYear(),
+        month: t.getUTCMonth(),
+        weekStart: fmtDate(startOfWeek(t)),
+      };
+    }
+
+    // ツールバー
+    const toolbar = el("div", { class: "cal-toolbar card" });
+    const tabs = el("div", { class: "cal-tabs" });
+    tabs.appendChild(btn("📆 月", "cal-view", { view: "month" }, "btn btn--small" + (ui.cal.view === "month" ? " btn--primary" : "")));
+    tabs.appendChild(btn("🗓️ 週", "cal-view", { view: "week" }, "btn btn--small" + (ui.cal.view === "week" ? " btn--primary" : "")));
+    toolbar.appendChild(tabs);
+
+    const nav = el("div", { class: "cal-nav" });
+    nav.appendChild(btn("◀", "cal-prev", {}, "btn btn--small"));
+    let title;
+    if (ui.cal.view === "month") {
+      title = ui.cal.year + "年" + (ui.cal.month + 1) + "月";
+    } else {
+      const ws = parseDate(ui.cal.weekStart);
+      const we = addDays(ws, 6);
+      title = (ws.getUTCMonth() + 1) + "/" + ws.getUTCDate() + " 〜 " + (we.getUTCMonth() + 1) + "/" + we.getUTCDate();
+    }
+    nav.appendChild(el("span", { class: "cal-title", text: title }));
+    nav.appendChild(btn("▶", "cal-next", {}, "btn btn--small"));
+    nav.appendChild(btn("今日", "cal-today", {}, "btn btn--small"));
+    toolbar.appendChild(nav);
+    root.appendChild(toolbar);
+
+    // 凡例
+    const legend = el("div", { class: "cal-legend tiny" }, [
+      el("span", { text: "進捗：" }),
+      el("span", { class: "intens-chip intensity-0", text: "0" }),
+      el("span", { class: "intens-chip intensity-1", text: "1〜4" }),
+      el("span", { class: "intens-chip intensity-2", text: "5〜9" }),
+      el("span", { class: "intens-chip intensity-3", text: "10〜15" }),
+      el("span", { class: "intens-chip intensity-4", text: "16+" }),
+      el("span", { attrs: { style: "margin-left:16px" }, text: "特別日：🎯 試験 / 📋 共テ / 📝 模試" }),
+    ]);
+
+    if (ui.cal.view === "month") {
+      root.appendChild(renderMonthGrid());
+    } else {
+      root.appendChild(renderWeekGrid());
+    }
+    root.appendChild(legend);
+
+    // サマリ（表示中の範囲の合計）
+    root.appendChild(renderRangeSummary());
+
+    return root;
+  }
+
+  function renderMonthGrid() {
+    const c = el("section", { class: "card" });
+    const grid = el("div", { class: "cal-month" });
+
+    // 曜日見出し
+    ["日", "月", "火", "水", "木", "金", "土"].forEach(function (w, i) {
+      grid.appendChild(el("div", {
+        class: "cal-weekday" + (i === 0 ? " is-sun" : i === 6 ? " is-sat" : ""),
+        text: w,
+      }));
+    });
+
+    // セル
+    const cells = buildMonthCells(ui.cal.year, ui.cal.month);
+    const sp = specialDays();
+    cells.forEach(function (cell) {
+      grid.appendChild(renderCell(cell, sp, false));
+    });
+
+    c.appendChild(grid);
+    return c;
+  }
+
+  function renderWeekGrid() {
+    const c = el("section", { class: "card" });
+    const grid = el("div", { class: "cal-week" });
+    const start = parseDate(ui.cal.weekStart) || startOfWeek(today());
+    const sp = specialDays();
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(start, i);
+      grid.appendChild(renderCell({ date: d, isOut: false }, sp, true));
+    }
+    c.appendChild(grid);
+    return c;
+  }
+
+  function buildMonthCells(year, month) {
+    const firstDay = new Date(Date.UTC(year, month, 1, 12));
+    const dayOfWeek = firstDay.getUTCDay();
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0, 12)).getUTCDate();
+    const cells = [];
+    for (let i = 0; i < dayOfWeek; i++) {
+      const d = new Date(Date.UTC(year, month, 1 - (dayOfWeek - i), 12));
+      cells.push({ date: d, isOut: true });
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      cells.push({ date: new Date(Date.UTC(year, month, i, 12)), isOut: false });
+    }
+    while (cells.length % 7 !== 0) {
+      const last = cells[cells.length - 1].date;
+      const d = new Date(last.getTime() + 86400000);
+      cells.push({ date: d, isOut: true });
+    }
+    return cells;
+  }
+
+  function renderCell(cell, sp, detailed) {
+    const dateISO = fmtDate(cell.date);
+    const log = state.dailyLog[dateISO];
+    const intens = intensityOf(log);
+    const isToday = dateISO === todayISO();
+    const dow = cell.date.getUTCDay();
+    const specials = sp[dateISO] || [];
+    const cls = [
+      detailed ? "cal-cell-wk" : "cal-cell",
+      "intensity-" + intens,
+    ];
+    if (cell.isOut) cls.push("is-out");
+    if (isToday)   cls.push("is-today");
+    if (dow === 0) cls.push("is-sun");
+    if (dow === 6) cls.push("is-sat");
+    const node = el("div", { class: cls.join(" ") });
+
+    // 日付
+    const dayLine = el("div", { class: "cal-day-line" }, [
+      el("span", { class: "cal-day-num", text: String(cell.date.getUTCDate()) }),
+      specials.length ? el("span", { class: "cal-special", attrs: { title: specials.map(function (s) { return s.label; }).join(" / ") } },
+        specials.slice(0, 3).map(function (s) { return el("span", { text: s.icon }); })) : null,
+    ]);
+    node.appendChild(dayLine);
+
+    // 進捗の中身
+    if (log && (log.completed || log.graded || log.mastered)) {
+      if (detailed) {
+        const stats = el("div", { class: "cal-week-stats" }, [
+          el("span", {}, [el("strong", { text: String(log.completed || 0) }), el("span", { text: "問完了" })]),
+          el("span", {}, [el("strong", { text: String(log.graded || 0) }), el("span", { text: "問採点" })]),
+          log.mastered ? el("span", { class: "cal-mastered", text: "🎉 習得+" + log.mastered }) : null,
+        ]);
+        node.appendChild(stats);
+      } else {
+        node.appendChild(el("div", { class: "cal-month-stats" }, [
+          el("span", { text: "✓" + (log.completed || 0) }),
+          el("span", { text: "/" }),
+          el("span", { text: "○" + (log.graded || 0) }),
+        ]));
+      }
+    } else if (detailed) {
+      node.appendChild(el("div", { class: "cal-week-empty muted", text: "— 記録なし" }));
+    }
+
+    // 特別日の詳細
+    if (detailed && specials.length) {
+      const sx = el("div", { class: "cal-week-specials" });
+      specials.forEach(function (s) {
+        sx.appendChild(el("div", { class: "cal-special-row" }, [
+          el("span", { text: s.icon + " " }),
+          el("span", { text: s.label }),
+        ]));
+      });
+      node.appendChild(sx);
+    }
+
+    return node;
+  }
+
+  function renderRangeSummary() {
+    // 表示中の範囲（月 or 週）の集計
+    let start, end;
+    if (ui.cal.view === "month") {
+      start = new Date(Date.UTC(ui.cal.year, ui.cal.month, 1, 12));
+      end = new Date(Date.UTC(ui.cal.year, ui.cal.month + 1, 0, 12));
+    } else {
+      start = parseDate(ui.cal.weekStart) || startOfWeek(today());
+      end = addDays(start, 6);
+    }
+    let completed = 0, graded = 0, mastered = 0, activeDays = 0;
+    for (let d = new Date(start.getTime()); d <= end; d = new Date(d.getTime() + 86400000)) {
+      const log = state.dailyLog[fmtDate(d)];
+      if (log) {
+        completed += log.completed || 0;
+        graded += log.graded || 0;
+        mastered += log.mastered || 0;
+        if ((log.completed || 0) + (log.graded || 0) > 0) activeDays++;
+      }
+    }
+    const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    const c = el("section", { class: "card" });
+    c.appendChild(el("h3", { class: "card__title", html: "📈 期間サマリ <span class='tiny'>" + fmtDate(start) + " 〜 " + fmtDate(end) + "</span>" }));
+    const row = el("div", { class: "kpi-row" });
+    row.appendChild(el("div", { class: "kpi" }, [
+      el("div", { class: "kpi__label", text: "学習日数" }),
+      el("div", { class: "kpi__value", text: activeDays + " / " + days + " 日" }),
+      el("div", { class: "kpi__sub", text: Math.round(activeDays / days * 100) + "% 稼働" }),
+    ]));
+    row.appendChild(el("div", { class: "kpi" }, [
+      el("div", { class: "kpi__label", text: "完了問題数" }),
+      el("div", { class: "kpi__value", text: String(completed) }),
+      el("div", { class: "kpi__sub", text: "1日あたり " + (activeDays ? Math.round(completed / activeDays * 10) / 10 : 0) }),
+    ]));
+    row.appendChild(el("div", { class: "kpi" }, [
+      el("div", { class: "kpi__label", text: "解き直し採点" }),
+      el("div", { class: "kpi__value", text: String(graded) }),
+      el("div", { class: "kpi__sub", text: "1日あたり " + (activeDays ? Math.round(graded / activeDays * 10) / 10 : 0) }),
+    ]));
+    row.appendChild(el("div", { class: "kpi" }, [
+      el("div", { class: "kpi__label", text: "新規習得" }),
+      el("div", { class: "kpi__value", text: String(mastered) }),
+      el("div", { class: "kpi__sub", text: "問題" }),
+    ]));
+    c.appendChild(row);
+    return c;
+  }
+
+  /* =============================================================
    * ページ：週次レビュー
    * ============================================================= */
 
@@ -1363,6 +1678,7 @@
       case "subjects": pageNode = renderSubjects(); break;
       case "today":    pageNode = renderToday(); break;
       case "review":   pageNode = renderReview(); break;
+      case "calendar": pageNode = renderCalendar(); break;
       case "weekly":   pageNode = renderWeekly(); break;
       case "settings": pageNode = renderSettings(); break;
       default:         pageNode = renderOverview();
@@ -1490,6 +1806,36 @@
     if (action === "export") { await exportBackup(); return; }
     if (action === "import") { await importBackup(); return; }
     if (action === "reset")  { await resetData(); return; }
+
+    // カレンダー
+    if (action === "cal-view")  { ui.cal.view = dataset.view; render(); return; }
+    if (action === "cal-prev")  {
+      if (ui.cal.view === "month") {
+        if (ui.cal.month === 0) { ui.cal.month = 11; ui.cal.year--; }
+        else ui.cal.month--;
+      } else {
+        const ws = parseDate(ui.cal.weekStart);
+        ui.cal.weekStart = fmtDate(addDays(ws, -7));
+      }
+      render(); return;
+    }
+    if (action === "cal-next")  {
+      if (ui.cal.view === "month") {
+        if (ui.cal.month === 11) { ui.cal.month = 0; ui.cal.year++; }
+        else ui.cal.month++;
+      } else {
+        const ws = parseDate(ui.cal.weekStart);
+        ui.cal.weekStart = fmtDate(addDays(ws, 7));
+      }
+      render(); return;
+    }
+    if (action === "cal-today") {
+      const t = today();
+      ui.cal.year = t.getUTCFullYear();
+      ui.cal.month = t.getUTCMonth();
+      ui.cal.weekStart = fmtDate(startOfWeek(t));
+      render(); return;
+    }
   }
 
   /* =============================================================
