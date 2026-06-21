@@ -231,6 +231,164 @@
     else state.dailyLog[key].subjects[subject] = next;
   }
 
+  /* =============================================================
+   * 褒める／お祝い演出（モチベーション）
+   * ============================================================= */
+
+  // 1問完了するたびに表示するランダムメッセージ
+  const PRAISE_MESSAGES = [
+    "👍 ナイス！", "💪 その調子！", "✨ よくやった！", "🎯 集中いいね！",
+    "🔥 がんばってる！", "⭐ えらい！", "🌟 さすが！", "💖 素晴らしい！",
+    "🚀 ぐんぐん進んでる！", "🌱 一歩前進！", "🏃 ペース最高！",
+  ];
+  // ○ で正解した時のメッセージ
+  const PRAISE_CORRECT = [
+    "🎯 正解！その調子！", "✨ できた！冴えてる！", "💯 完璧！",
+    "🌟 マスターしつつある！", "👏 完全に理解してる！",
+  ];
+  // △ の時の前向きメッセージ
+  const PRAISE_PARTIAL = [
+    "👍 もう少しで○！", "✏️ 一歩前進！", "📈 着実に伸びてる！",
+    "🌿 着実に積み上がってるよ！",
+  ];
+  // × の時の励まし
+  const PRAISE_WRONG = [
+    "💪 大丈夫、明日また挑戦！", "📚 弱点発見もまた成長！",
+    "🌱 ここを克服したら強くなれる！", "🛠 直すべき場所が見えたね！",
+  ];
+
+  // 節目（cumulative completed）— 数が増えるほど派手に
+  const MILESTONES = [
+    { count: 10,    emoji: "🎉", title: "10問達成！",       sub: "コツコツの第一歩を踏み出したね。",       intensity: 1 },
+    { count: 30,    emoji: "🎊", title: "30問突破！",       sub: "もう習慣になりつつあるよ。",             intensity: 2 },
+    { count: 50,    emoji: "🌟", title: "50問達成！",       sub: "順調すぎる。このまま続けよう！",         intensity: 2 },
+    { count: 100,   emoji: "🏆", title: "100問達成！",      sub: "本当にすごい！君ならいける。",           intensity: 3 },
+    { count: 200,   emoji: "💎", title: "200問突破！",      sub: "継続は力なり、まさに体現中。",           intensity: 3 },
+    { count: 300,   emoji: "🥇", title: "300問達成！",      sub: "もう完全に本気モードだね！",             intensity: 4 },
+    { count: 500,   emoji: "👑", title: "500問の壁を突破！", sub: "並大抵じゃない努力だよ。",               intensity: 4 },
+    { count: 1000,  emoji: "🚀", title: "1000問達成！",     sub: "君はもう伝説の領域だ！",                  intensity: 5 },
+    { count: 2000,  emoji: "🌈", title: "2000問達成！",     sub: "信じられない！君は本当に強い。",          intensity: 5 },
+    { count: 5000,  emoji: "🌌", title: "5000問達成！",     sub: "宇宙級の継続力。誇りに思って。",          intensity: 5 },
+    { count: 10000, emoji: "🔱", title: "10000問達成！",    sub: "もはや人智を超えている。神域だ。",        intensity: 5 },
+  ];
+
+  // 累計完了数（全ダミー含む）
+  function cumulativeCompleted() {
+    let n = 0;
+    Object.keys(state.dailyLog).forEach(function (k) {
+      n += state.dailyLog[k].completed || 0;
+    });
+    return n;
+  }
+
+  // 起動時に「既に達成済みのマイルストーン」を初期化（過去ログで連続爆発しないように）
+  function initCelebrations(s) {
+    if (!s.celebrations) s.celebrations = { lastMilestone: -1 };
+    let total = 0;
+    Object.keys(s.dailyLog || {}).forEach(function (k) {
+      total += s.dailyLog[k].completed || 0;
+    });
+    for (let i = MILESTONES.length - 1; i >= 0; i--) {
+      if (total >= MILESTONES[i].count) {
+        s.celebrations.lastMilestone = Math.max(s.celebrations.lastMilestone, i);
+        break;
+      }
+    }
+  }
+
+  // 演出を仕込むレイヤー
+  function effectLayer() {
+    let l = document.getElementById("effect-layer");
+    if (!l) {
+      l = el("div", { attrs: { id: "effect-layer" } });
+      document.body.appendChild(l);
+    }
+    return l;
+  }
+
+  // キラキラ（小さな褒め）
+  function spawnSparkles(count) {
+    const layer = effectLayer();
+    const chars = ["✨", "⭐", "💫", "🌟", "💖"];
+    for (let i = 0; i < count; i++) {
+      const s = el("div", { class: "spark" });
+      const offX = (Math.random() - 0.5) * 320;
+      const offY = (Math.random() - 0.5) * 80;
+      s.style.left = "calc(50% + " + offX + "px)";
+      s.style.top = "calc(50% + " + offY + "px)";
+      s.style.animationDelay = (Math.random() * 0.25) + "s";
+      s.textContent = chars[Math.floor(Math.random() * chars.length)];
+      layer.appendChild(s);
+      setTimeout(function () { s.remove(); }, 2000);
+    }
+  }
+
+  // 紙吹雪（大きなお祝い）
+  function spawnConfetti(count) {
+    const layer = effectLayer();
+    const colors = ["#3b82f6", "#f59e0b", "#ef4444", "#10b981", "#8b5cf6", "#ec4899", "#f97316", "#22d3ee"];
+    for (let i = 0; i < count; i++) {
+      const c = el("div", { class: "confetti" });
+      c.style.left = (Math.random() * 100) + "%";
+      c.style.background = colors[Math.floor(Math.random() * colors.length)];
+      c.style.animationDelay = (Math.random() * 0.6) + "s";
+      c.style.animationDuration = (2.4 + Math.random() * 1.8) + "s";
+      c.style.transform = "rotate(" + (Math.random() * 360) + "deg)";
+      c.style.width = (6 + Math.random() * 8) + "px";
+      c.style.height = (10 + Math.random() * 8) + "px";
+      layer.appendChild(c);
+      setTimeout(function () { c.remove(); }, 5000);
+    }
+  }
+
+  // 小さな褒め
+  function celebrateSmall(kind) {
+    let pool = PRAISE_MESSAGES;
+    if (kind === "correct") pool = PRAISE_CORRECT;
+    else if (kind === "partial") pool = PRAISE_PARTIAL;
+    else if (kind === "wrong") pool = PRAISE_WRONG;
+    flash(pool[Math.floor(Math.random() * pool.length)]);
+    spawnSparkles(kind === "wrong" ? 3 : 7);
+  }
+
+  // 節目チェック → 大きなお祝い
+  function checkMilestone() {
+    if (!state.celebrations) state.celebrations = { lastMilestone: -1 };
+    const total = cumulativeCompleted();
+    for (let i = state.celebrations.lastMilestone + 1; i < MILESTONES.length; i++) {
+      if (total >= MILESTONES[i].count) {
+        state.celebrations.lastMilestone = i;
+        celebrateMilestone(MILESTONES[i]);
+        saveState();
+        return;
+      }
+    }
+  }
+
+  function celebrateMilestone(m) {
+    // 強度に応じた紙吹雪量
+    const confettiCount = 40 + m.intensity * 40;
+    spawnConfetti(confettiCount);
+
+    // オーバーレイ＋カード
+    const overlay = el("div", { class: "milestone-overlay" });
+    const card = el("div", { class: "milestone-card intensity-" + m.intensity }, [
+      el("div", { class: "milestone-emoji", text: m.emoji }),
+      el("div", { class: "milestone-title", text: m.title }),
+      el("div", { class: "milestone-subtitle", text: m.sub }),
+      el("button", { class: "btn btn--primary milestone-close", text: "ありがとう！" }),
+    ]);
+    overlay.appendChild(card);
+    function dismiss() { overlay.classList.add("is-leaving"); setTimeout(function () { overlay.remove(); }, 300); }
+    card.querySelector(".milestone-close").addEventListener("click", dismiss);
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) dismiss();
+    });
+    document.body.appendChild(overlay);
+    // 自動で消える
+    setTimeout(dismiss, 6000 + m.intensity * 1000);
+  }
+
   // 今日の計画科目（todaySchedule の学習スロットから抽出）
   function plannedSubjectsToday() {
     const set = {};
@@ -248,6 +406,7 @@
   function rolloverIfNeeded(s) {
     if (!s) return s;
     if (!s.dailyLog) s.dailyLog = {};
+    if (!s.celebrations) initCelebrations(s);
     if (s.completedDate !== todayISO()) {
       s.completedToday = {};
       s.completedDate = todayISO();
@@ -372,7 +531,9 @@
         state.completedToday[id] = true;
         bumpDailyLog("mastered", 1);
         await saveState(); render();
-        flash(r.subject + "「" + r.problem + "」を習得済みに 🎉");
+        flash("🎉 " + r.subject + "「" + r.problem + "」を完全マスター！");
+        spawnConfetti(60);
+        checkMilestone();
         return;
       }
       r.intervalStage = Math.min(MAX_STAGE, r.intervalStage + 1);
@@ -390,13 +551,17 @@
     r.nextDate = fmtDate(addDays(base, nextDays));
     state.completedToday[id] = true;
     await saveState(); render();
-    flash(r.subject + "を「" + result + "」で採点 → 次回 " + r.nextDate);
+    // 結果に応じたメッセージ
+    const kind = result === "○" ? "correct" : result === "△" ? "partial" : "wrong";
+    celebrateSmall(kind);
+    checkMilestone();
   }
 
   async function toggleProblem(id) {
     const r = reviewById(id);
     const subj = r ? r.subject : null;
-    if (state.completedToday[id]) {
+    const wasChecked = !!state.completedToday[id];
+    if (wasChecked) {
       delete state.completedToday[id];
       bumpDailyLog("completed", -1);
       bumpDailySubject(subj, -1);
@@ -406,6 +571,10 @@
       bumpDailySubject(subj, 1);
     }
     await saveState(); render();
+    if (!wasChecked) {
+      celebrateSmall();
+      checkMilestone();
+    }
   }
   async function bumpMaterial(id, delta) {
     const m = state.materials.find(function (x) { return x.id === id; });
